@@ -6,8 +6,7 @@ import { faArrowUp, faPoundSign } from '@fortawesome/free-solid-svg-icons';
 import LineChartCard from '../../components/LineChartCard';
 
 export default function ManagerDashboard() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const toggleSidebar = () => setIsSidebarOpen(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const closeSidebar = () => setIsSidebarOpen(false);
   const toggleSidebars = () => {
   setIsSidebarOpen(prev => {
@@ -21,7 +20,7 @@ export default function ManagerDashboard() {
       <AdminNavBar toggleSidebar={toggleSidebars} isSideBarOpen={isSidebarOpen}/>
       <AdminSideBar isOpen={isSidebarOpen} closeSidebar={closeSidebar} activeLink="/admin/Dashboard"/>
       <div className='md:flex md:justify-end'>
-        <div className={`pt-32 px-5 ${isSidebarOpen ? "md:w-[70%] lg:w-[75%]" : "md:w-full"} transition-all duration-500`}>
+        <div className={`pt-32 px-5 ${isSidebarOpen ? "md:w-[75%] lg:w-[80%]" : "md:w-full"} transition-all duration-500`}>
           <div>
             <h2 className='text-3xl font-display2 font-bold'>Welcome, Franklyn</h2>
           </div>

@@ -40,8 +40,16 @@ const AdminSideBar = ({ isOpen, activeLink, closeSidebar, className }) => {
       path: "/admin/Menu",
       children: [
         { name: "Add to Menu", path: "/admin/menu/add", icon: faPlusCircle },
-        { name: "Menu Detail", path: "/admin/menu/detail", icon: faInfoCircle },
         { name: "All Menu", path: "/admin/menu/all", icon: faThLarge },
+      ],
+    },
+    {
+      name: "Categories",
+      icon: faUtensils,
+      path: "/admin/Categories",
+      children: [
+        { name: "Add Category", path: "/admin/categories/add", icon: faPlusCircle },
+        { name: "All Categories", path: "/admin/categories/all", icon: faThLarge },
       ],
     },
     {
@@ -60,15 +68,6 @@ const AdminSideBar = ({ isOpen, activeLink, closeSidebar, className }) => {
       children: [
         { name: "All Invoices", path: "/admin/employees/all", icon: faFileInvoice },
         { name: "New Invoice", path: "/admin/employees/add", icon: faFileCirclePlus },
-      ],
-    },
-    {
-      name: "Offers",
-      icon: faTags,
-      children: [
-        { name: "New Offers", path: "/admin/employees/all", icon: faPlusCircle },
-        { name: "Existing Offers", path: "/admin/employees/add", icon: faClipboardList },
-        { name: "All Offers", path: "/admin/employees/add", icon: faListAlt },
       ],
     },
     { name: "Reports", icon: faChartBar, path: "/admin/reports" },
@@ -114,7 +113,7 @@ const AdminSideBar = ({ isOpen, activeLink, closeSidebar, className }) => {
 
       {/* Sidebar */}
       <div
-        className={`fixed top-0 w-64  md:w-[30%] lg:w-[25%] h-screen bg-own-1 md:bg-black text-[#dfe3e7] transform ${
+        className={`fixed top-0 w-64  md:w-[25%] lg:w-[20%] h-screen bg-own-1 md:bg-black text-[#dfe3e7] transform ${
           isOpen ? "translate-x-0" : "translate-x-[-320px]"
         } transition-transform duration-500 z-50 ${className}`}
       >
@@ -142,7 +141,7 @@ const AdminSideBar = ({ isOpen, activeLink, closeSidebar, className }) => {
                         isActive ? "bg-own-2 text-black" : ""
                       }`}
                     >
-                      <span className="flex items-center gap-2">
+                      <span className="flex items-center gap-3">
                         <FontAwesomeIcon icon={item.icon} />
                         {item.name}
                       </span>
@@ -161,7 +160,7 @@ const AdminSideBar = ({ isOpen, activeLink, closeSidebar, className }) => {
                         {item.children.map((child) => (
                           <li key={child.name}>
                             <Link to={child.path}>
-                              <div className="py-2 px-4 rounded text-sm flex items-center gap-2 hover:bg-own-2 hover:text-black">
+                              <div className="py-2 px-4 rounded text-sm flex items-center gap-3 hover:bg-own-2 hover:text-black">
                                 <FontAwesomeIcon icon={child.icon} />
                                 {child.name}
                               </div>
@@ -174,7 +173,7 @@ const AdminSideBar = ({ isOpen, activeLink, closeSidebar, className }) => {
                 ) : (
                   <Link to={item.path}>
                     <button
-                      className={`w-full flex items-center gap-2 py-2 px-4 rounded hover:cursor-pointer ${
+                      className={`w-full flex items-center gap-3 py-2 px-4 rounded hover:cursor-pointer ${
                         isActive ? "bg-own-2 text-black" : ""
                       }`}
                     >

@@ -44,7 +44,7 @@ const AdminNavBar = ({toggleSidebar, isSideBarOpen}) => {
     return(
             <Element name="top">
               <div className="md:flex md:justify-end">
-                <header className={`select-none w-full flex justify-between items-center transition-all duration-100 ease-in z-40 lg:px-10 px-5 text-white bg-black py-5 shadow-lg fixed ${isSideBarOpen ? "md:w-[70%] lg:w-[75%]" : "md:w-full"} transition-all duration-300 ease-in-out`}>
+                <header className={`select-none w-full flex justify-between items-center transition-all duration-100 ease-in z-40 lg:px-10 px-5 text-white bg-black py-5 shadow-lg fixed ${isSideBarOpen ? "md:w-[75%] lg:w-[80%]" : "md:w-full"} transition-all duration-300 ease-in-out`}>
                     <div className="">
                         <button className="text-white text-3xl" onClick={toggleSidebar}>
                             <FontAwesomeIcon icon={faBars}/>

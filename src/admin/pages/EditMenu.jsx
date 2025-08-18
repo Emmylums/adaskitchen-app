@@ -1,18 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation, useParams } from "react-router-dom";
 import AdminSideBar from '../components/AdminSidebar';
 import AdminNavBar from '../components/AdminNavbar';
 import ImageUploadBox from '../components/ImageUploadBox';
-import { FaStar } from 'react-icons/fa';
 
 export default function EditMenu() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const toggleSidebar = () => setIsSidebarOpen(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const closeSidebar = () => setIsSidebarOpen(false);
-  const toggleSidebars = () => {
+  const toggleSidebar = () => {
   setIsSidebarOpen(prev => {
     const newState = !prev;    return newState;
     });
     };
+
+    const { id } = useParams();   // will be undefined in add mode
+  const location = useLocation();
+  const menuItem = location.state; // row data passed from AllMenu when editing
+
+  const isEditMode = Boolean(id);
 
     const categories = ['Breakfast', 'Lunch', 'Dinner', 'Drinks', 'Snacks', 'Dessert'];
   const [menuImage, setMenuImage] = useState(null);
@@ -22,18 +27,22 @@ export default function EditMenu() {
     price: '',
     ingredients: '',
     description: '',
-    rating: 0,
-    category: '',
+    category: [],
   });
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
+  const { name, value, options, multiple } = e.target;
 
-  const handleRating = (rating) => {
-    setFormData(prev => ({ ...prev, rating }));
-  };
+  if (multiple) {
+    const selectedOptions = Array.from(options)
+      .filter(option => option.selected)
+      .map(option => option.value);
+
+    setFormData(prev => ({ ...prev, [name]: selectedOptions }));
+  } else {
+    setFormData(prev => ({ ...prev, [name]: value }));
+  }
+};
 
   const handleReset = () => {
     setFormData({
@@ -42,8 +51,7 @@ export default function EditMenu() {
       price: '',
       ingredients: '',
       description: '',
-      rating: 0,
-      category: '',
+      category: [],
     });
     setMenuImage(null);
   };
@@ -56,18 +64,38 @@ export default function EditMenu() {
       image: menuImage,
     };
 
-    console.log("Submitted Menu Data:", completeData);
-    // Send to backend or storage logic goes here
+    if (isEditMode) {
+      console.log("Updating menu item:", id, completeData);
+      // axios.put(`/api/menu/${id}`, completeData)
+    } else {
+      console.log("Adding new menu item:", completeData);
+      // axios.post(`/api/menu`, completeData)
+    }
   };
+
+
+  useEffect(() => {
+    if (isEditMode && menuItem) {
+      setFormData({
+        name: menuItem.name || "",
+        quantity: menuItem.quantity || "",
+        price: menuItem.price || "",
+        ingredients: menuItem.ingredients || "",
+        description: menuItem.description || "",
+        category: menuItem.category ? menuItem.category.split(",") : [],
+      });
+      setMenuImage(menuItem.image || null);
+    }
+  }, [isEditMode, menuItem]);
 
 
 
   return (
     <>
-      <AdminNavBar toggleSidebar={toggleSidebars} isSideBarOpen={isSidebarOpen}/>
+      <AdminNavBar toggleSidebar={toggleSidebar} isSideBarOpen={isSidebarOpen}/>
       <AdminSideBar isOpen={isSidebarOpen} closeSidebar={closeSidebar} activeLink="/admin/menu/add"/>
       <div className='md:flex md:justify-end'>
-        <form onSubmit={handleSubmit} className={`pt-32 px-5 md:px-10 md:flex md:justify-between md:gap-16 ${isSidebarOpen ? "md:w-[70%] lg:w-[75%]" : "md:w-full"} transition-all duration-500`}>
+        <form onSubmit={handleSubmit} className={`pt-32 pb-10 px-5 md:px-10 md:flex md:justify-between md:gap-16 ${isSidebarOpen ? "md:w-[75%] lg:w-[80%]" : "md:w-full"} transition-all duration-500`}>
           <ImageUploadBox onImageSelect={setMenuImage}/>
           <div className='md:w-[50%]'>
             <h2 className='text-left w-full text-2xl mb-3.5 font-semibold font-display2'>General Information</h2>
@@ -124,6 +152,7 @@ export default function EditMenu() {
                             name="category"
                             value={formData.category}
                             onChange={handleChange}
+                            multiple
                             required
                             className="w-full  bg-own-1 text-white border border-none font-display font-light rounded-lg focus:outline-none">
                             <option value="" disabled hidden>Select Category</option>
@@ -175,7 +204,7 @@ export default function EditMenu() {
                 type="submit"
                 className="px-6 py-3 bg-own-2 text-black font-semibold font-display rounded-lg hover:bg-own-2-dark transition"
                 >
-                Save To Menu
+                {isEditMode ? "Update Menu" : "Save To Menu"}
                 </button>
                 </div>
             </div>

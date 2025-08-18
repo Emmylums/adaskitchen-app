@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { faCloudUpload } from '@fortawesome/free-solid-svg-icons';
+import { faCloudUpload, faPoundSign } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 const ImageUploadBox = ({ onImageSelect }) => {
@@ -68,7 +68,7 @@ const ImageUploadBox = ({ onImageSelect }) => {
           />
         ) : (
           <div className="flex flex-col items-center px-5 text-center">
-            <FontAwesomeIcon icon={faCloudUpload} className="text-5xl mb-5 text-own-2" />
+            <FontAwesomeIcon icon={faCloudUpload} className="text-5xl mb-5 text-own-2 animate-pulse" />
             <h3 className="text-3xl font-light font-display2 my-4">
               Drop your image here, or <span className="text-own-2 font-medium">click to browse</span>
             </h3>
@@ -83,6 +83,9 @@ const ImageUploadBox = ({ onImageSelect }) => {
           onChange={handleFileInputChange}
         />
       </div>
+      <p className='hidden md:block pt-10 font-display2 '>Note: <br />1. When using Pc hold down control key to select multiple Categories <br />
+      2. All Ingredients should be separated with a comma <br />
+      3. Each price should be entered in Pounds (<FontAwesomeIcon icon={faPoundSign} className='text-sm'/>)</p>
     </div>
   );
 };

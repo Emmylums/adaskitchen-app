@@ -15,6 +15,7 @@ import Menu from "./pages/Menu";
 import Checkout from "./pages/Checkout";
 import AdminHome from "./admin/pages/AdminHome";
 import EditMenu from "./admin/pages/EditMenu";
+import AllMenu from "./admin/pages/AllMenu";
 
 
 function ScrollToTop() {
@@ -47,6 +48,8 @@ function App() {
         <Route exact path="/Signup" element={<Signup/>}/>
         <Route path="/admin/Dashboard" element={<AdminHome />} />
         <Route path="/admin/menu/add" element={<EditMenu />} />
+        <Route path="/admin/menu/edit/:id" element={<EditMenu />} />
+        <Route path="/admin/menu/all" element={<AllMenu />} />
         <Route path="*" element={<Error statusCode={404} message="Page Not Found" />} />
       </Routes>
     </BrowserRouter>
