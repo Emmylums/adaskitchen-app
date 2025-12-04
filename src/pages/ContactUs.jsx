@@ -28,17 +28,17 @@ export default function ContactUs() {
           <div>
             <h2 className="text-3xl font-bold text-own-2 mb-8">Get In Touch</h2>
             <form>
-              <div className="mt-6">
+              <div className="mt-6 text-black">
                 <label className="block font-medium mb-2">Name</label>
-                <input type="text" className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-own-2" placeholder="Your Name" />
+                <input type="text" className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-own-2 " placeholder="Your Name" />
               </div>
 
-              <div className="mt-6">
+              <div className="mt-6 text-black">
                 <label className="block font-medium mb-2">Email</label>
                 <input type="email" className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-own-2" placeholder="Your Email" />
               </div>
 
-              <div className="mt-6">
+              <div className="mt-6 text-black">
                 <label className="block font-medium mb-2">Message</label>
                 <textarea rows="5" className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-own-2" placeholder="Your Message"></textarea>
               </div>

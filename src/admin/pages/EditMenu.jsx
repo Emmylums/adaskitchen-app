@@ -96,7 +96,7 @@ export default function EditMenu() {
       <AdminSideBar isOpen={isSidebarOpen} closeSidebar={closeSidebar} activeLink="/admin/menu/add"/>
       <div className='md:flex md:justify-end'>
         <form onSubmit={handleSubmit} className={`pt-32 pb-10 px-5 md:px-10 md:flex md:justify-between md:gap-16 ${isSidebarOpen ? "md:w-[75%] lg:w-[80%]" : "md:w-full"} transition-all duration-500`}>
-          <ImageUploadBox onImageSelect={setMenuImage}/>
+          <ImageUploadBox onImageSelect={setMenuImage} page="Product"/>
           <div className='md:w-[50%]'>
             <h2 className='text-left w-full text-2xl mb-3.5 font-semibold font-display2'>General Information</h2>
             <div className='flex flex-col md:flex-row gap-5 justify-between'>

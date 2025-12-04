@@ -1,105 +1,26 @@
-import {
-  faClose,
-  faHome,
-  faUtensils,
-  faPlusCircle,
-  faInfoCircle,
-  faThLarge,
-  faShoppingCart,
-  faFileInvoiceDollar,
-  faUsers,
-  faTags,
-  faChartBar,
-  faCog,
-  faChevronRight,
-  faChevronDown,
-  faUserTie,
-  faUserPlus,
-  faListAlt,
-  faClipboardList,
-  faFileCirclePlus,
-  faFileInvoice,
-} from "@fortawesome/free-solid-svg-icons";
+import { faBox, faCalendarAlt, faChartBar, faClock, faFileInvoice, faImages, faMapMarkerAlt, faShoppingCart, faSignOutAlt, faTags, faTimes, faUser, faUtensils } from "@fortawesome/free-solid-svg-icons";
+import { motion } from 'framer-motion';
+import { Link } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
 
-const AdminSideBar = ({ isOpen, activeLink, closeSidebar, className }) => {
-  const location = useLocation();
-  const [expanded, setExpanded] = useState(null);
-
-  const handleExpand = (itemName) => {
-    setExpanded(expanded === itemName ? null : itemName);
+const AdminSideBar = ({ isOpen, closeSidebar, activeTab, setActiveTab, userData }) => { 
+  // Format last login date
+  const formatLastLogin = (dateString) => {
+    const date = new Date(dateString);
+    return {
+      date: date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      }),
+      time: date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    };
   };
 
-  const menuItems = [
-    { name: "Dashboard", icon: faHome, path: "/admin/Dashboard" },
-    {
-      name: "Menu",
-      icon: faUtensils,
-      path: "/admin/Menu",
-      children: [
-        { name: "Add to Menu", path: "/admin/menu/add", icon: faPlusCircle },
-        { name: "All Menu", path: "/admin/menu/all", icon: faThLarge },
-      ],
-    },
-    {
-      name: "Categories",
-      icon: faUtensils,
-      path: "/admin/Categories",
-      children: [
-        { name: "Add Category", path: "/admin/categories/add", icon: faPlusCircle },
-        { name: "All Categories", path: "/admin/categories/all", icon: faThLarge },
-      ],
-    },
-    {
-      name: "Employees",
-      icon: faUserTie,
-      path: "/admin/Employees",
-      children: [
-        { name: "All Employees", path: "/admin/employees/all", icon: faUsers },
-        { name: "Add Employee", path: "/admin/employees/add", icon: faUserPlus },
-      ],
-    },
-    { name: "Orders", icon: faShoppingCart, path: "/admin/orders" },
-    {
-      name: "Invoice",
-      icon: faFileInvoiceDollar,
-      children: [
-        { name: "All Invoices", path: "/admin/employees/all", icon: faFileInvoice },
-        { name: "New Invoice", path: "/admin/employees/add", icon: faFileCirclePlus },
-      ],
-    },
-    { name: "Reports", icon: faChartBar, path: "/admin/reports" },
-    { name: "Settings", icon: faCog, path: "/admin/settings" },
-  ];
-
-  // Auto-expand menu if child path matches
-  useEffect(() => {
-    const match = menuItems.find((item) =>
-      item.children?.some((child) => child.path === location.pathname)
-    );
-    if (match) {
-      setExpanded(match.name);
-    }
-
-    // Optional: log active menu item and path
-    const findActiveMenuItem = (items) => {
-      for (let item of items) {
-        if (item.children) {
-          const foundChild = item.children.find((child) => child.path === location.pathname);
-          if (foundChild) {
-            return { name: foundChild.name, path: foundChild.path };
-          }
-        } else if (item.path === location.pathname) {
-          return { name: item.name, path: item.path };
-        }
-      }
-      return null;
-    };
-
-    const active = findActiveMenuItem(menuItems);
-  }, [location.pathname]);
+  const lastLogin = formatLastLogin(userData.lastLogin);
 
   return (
     <>
@@ -113,79 +34,106 @@ const AdminSideBar = ({ isOpen, activeLink, closeSidebar, className }) => {
 
       {/* Sidebar */}
       <div
-        className={`fixed top-0 w-64  md:w-[25%] lg:w-[20%] h-screen bg-own-1 md:bg-black text-[#dfe3e7] transform ${
+        className={`fixed top-0 w-80 md:w-[30%] lg:w-[25%] h-screen bg-own-1 md:bg-transparent text-[#dfe3e7] transform ${
           isOpen ? "translate-x-0" : "translate-x-[-320px]"
-        } transition-transform duration-500 z-50 ${className}`}
+        } transition-transform duration-500 z-50`}
       >
-        <div className="flex justify-between md:justify-center pt-10 pb-5 px-5 items-center bg-own-1">
-          <h2 className="text-xl font-bold">Ada's Kitchen</h2>
-          <button className="text-xl md:hidden" onClick={closeSidebar}>
-            <FontAwesomeIcon icon={faClose} />
-          </button>
-        </div>
+        <motion.div 
+          initial={{ x: -300, opacity: 0 }}
+          animate={{ 
+            x: isOpen ? 0 : -300, 
+            opacity: isOpen ? 1 : 0 
+          }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          className="fixed top-0 left-0 h-full bg-own-2 shadow-xl z-40 lg:relative lg:left-0 lg:shadow-none lg:z-0 pb-20 md:pb-0"
+        >
+          <div className="flex justify-between items-center p-4 border-b lg:hidden">
+            <span className="font-bold text-white text-lg">Admin Panel</span>
+            <button onClick={closeSidebar} className="text-black text-lg">
+              <FontAwesomeIcon icon={faTimes}/>
+            </button>
+          </div>
+          
+          {/* Scrollable content with hidden scrollbar */}
+          <div className="h-full overflow-y-auto p-6 sidebar-scroll">
+            <h1 className="text-white font-bold text-2xl pb-5 pt-3 hidden md:block">Admin Panel</h1>
+            <div className="mt-5 flex mb-10 rounded-xl p-3.5 items-center bg-amber-600">
+              <div className="w-10 h-10 mr-5 bg-white rounded-full flex items-center justify-center">
+                <FontAwesomeIcon icon={faUser} className="text-xl text-amber-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-white mb-0.5">{userData.name}</h3>
+                <p className="text-xs text-white mb-0.5">{userData.email}</p>
+                <p className="text-xs text-white font-bold uppercase">{userData.position}</p>
+              </div>
+            </div>
 
-        <ul className="md:pt-7 px-5">
-          {menuItems.map((item) => {
-            const isChildActive = item.children?.some(
-              (child) => child.path === location.pathname
-            );
-            const isActive = item.path === location.pathname || isChildActive;
+            <nav>
+              {[
+                { id: "Dashboard", icon: faChartBar, label: "Dashboard" },
+                { id: "Menu", icon: faUtensils, label: "Menu Management" },
+                { id: "Categories", icon: faTags, label: "Categories" },
+                { id: "Gallery", icon: faImages, label: "Gallery" },
+                { id: "Catering", icon: faBox, label: "Catering Packages" },
+                { id: "Orders", icon: faShoppingCart, label: "Orders" },
+                { id: "Invoices", icon: faFileInvoice, label: "Invoices" },
+              ].map((item) => (
+                <Link to={`/admin/${item.id}`} key={item.id}>
+                  <button
+                    onClick={() => setActiveTab(item.id)}
+                    className={`w-full text-left px-4 py-3 rounded-xl transition-colors mb-3 ${
+                      activeTab === item.id 
+                        ? "bg-amber-600 hover:bg-amber-800 text-white" 
+                        : "text-white hover:bg-amber-400"
+                    }`}
+                  >
+                    <FontAwesomeIcon icon={item.icon} className="mr-3" />
+                    {item.label}
+                  </button>
+                </Link>
+              ))}
 
-            return (
-              <li key={item.name} className="mb-2">
-                {item.children ? (
-                  <>
-                    <button
-                      onClick={() => handleExpand(item.name)}
-                      className={`w-full flex justify-between items-center py-2 px-4 rounded ${
-                        isActive ? "bg-own-2 text-black" : ""
-                      }`}
-                    >
-                      <span className="flex items-center gap-3">
-                        <FontAwesomeIcon icon={item.icon} />
-                        {item.name}
-                      </span>
-                      <FontAwesomeIcon
-                        icon={expanded === item.name ? faChevronDown : faChevronRight}
-                        className="text-sm"
-                      />
-                    </button>
+              <button className="w-full text-left px-4 py-3 rounded-xl text-red-600 hover:bg-white transition-colors mt-5">
+                <FontAwesomeIcon icon={faSignOutAlt} className="mr-3" />
+                Sign Out
+              </button>
+            </nav>
 
-                    <div
-                      className={`transition-all duration-400 ease-in-out overflow-hidden ${
-                        expanded === item.name ? "max-h-40 opacity-100" : "max-h-0 opacity-0"
-                      }`}
-                    >
-                      <ul className="ml-6 mt-1 space-y-1">
-                        {item.children.map((child) => (
-                          <li key={child.name}>
-                            <Link to={child.path}>
-                              <div className="py-2 px-4 rounded text-sm flex items-center gap-3 hover:bg-own-2 hover:text-black">
-                                <FontAwesomeIcon icon={child.icon} />
-                                {child.name}
-                              </div>
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </>
-                ) : (
-                  <Link to={item.path}>
-                    <button
-                      className={`w-full flex items-center gap-3 py-2 px-4 rounded hover:cursor-pointer ${
-                        isActive ? "bg-own-2 text-black" : ""
-                      }`}
-                    >
-                      <FontAwesomeIcon icon={item.icon} />
-                      {item.name}
-                    </button>
-                  </Link>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+            {/* Last Login Session */}
+            <div className="mt-8 p-4 bg-gray-50 rounded-xl">
+              <div className="text-center">
+                <div className="w-12 h-12 mx-auto mb-2 bg-own-2 rounded-full flex items-center justify-center">
+                  <FontAwesomeIcon icon={faClock} className="text-white" />
+                </div>
+                <h4 className="font-semibold text-gray-800 mb-2">Last Login</h4>
+                <p className="text-sm text-gray-600 mb-1">
+                  <FontAwesomeIcon icon={faCalendarAlt} className="mr-2 text-own-2" />
+                  {lastLogin.date}
+                </p>
+                <p className="text-sm text-gray-600 mb-2">
+                  <FontAwesomeIcon icon={faClock} className="mr-2 text-own-2" />
+                  {lastLogin.time}
+                </p>
+                <p className="text-xs text-gray-500">
+                  <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-1" />
+                  {userData.loginLocation}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Add custom CSS for hiding scrollbar */}
+          <style jsx>{`
+            .sidebar-scroll {
+              scrollbar-width: none;  /* Firefox */
+              -ms-overflow-style: none;  /* IE and Edge */
+            }
+            
+            .sidebar-scroll::-webkit-scrollbar {
+              display: none;  /* Chrome, Safari and Opera */
+            }
+          `}</style>
+        </motion.div>
       </div>
     </>
   );

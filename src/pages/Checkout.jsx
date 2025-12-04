@@ -71,7 +71,7 @@ export default function Checkout() {
         </div>
       </section>
 
-      <div className="max-w-5xl mx-auto px-4 py-16 grid grid-cols-1 md:grid-cols-2 gap-10">
+      <div className="max-w-5xl mx-auto px-4 py-16 grid grid-cols-1 md:grid-cols-2 gap-10 text-black">
         {/* Left - Form */}
         <form onSubmit={handlePlaceOrder} className="bg-white rounded-2xl shadow-md p-8">
           <h3 className="text-2xl font-bold text-own-2 mb-6">Customer Information</h3>
@@ -117,7 +117,7 @@ export default function Checkout() {
         </form>
 
         {/* Right - Cart Summary */}
-        <div className="bg-gray-50 rounded-2xl shadow-md p-8">
+        <div className="bg-gray-50 rounded-2xl shadow-md p-8 text-black">
           <h3 className="text-2xl font-bold text-own-2 mb-6">Order Summary</h3>
           <ul className="divide-y divide-gray-200">
             {cart.map(item => (

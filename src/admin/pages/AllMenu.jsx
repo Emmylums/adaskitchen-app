@@ -9,27 +9,20 @@ import { useNavigate } from 'react-router-dom';
 export default function AllMenu() {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [hoveredRow, setHoveredRow] = useState(null); // Track which row is hovered
   const closeSidebar = () => setIsSidebarOpen(false);
   const toggleSidebar = () => {
-  setIsSidebarOpen(prev => {
-    const newState = !prev;    return newState;
+    setIsSidebarOpen(prev => {
+      const newState = !prev;
+      return newState;
     });
-    };
+  };
 
-    const data = [
-      {image: jollofImg, name: "Italian Burata Pizza", description: "Pizza is a traditional Italian dish typically consisting of a flat base of", ingredients: "Mushrooms , Bell Peppers , Onions , Italian Sausage , Olives , Fresh Basil , Fresh Mozzarella", price: "$12.00", quantity: 10, category: "Pizza, Snack"},
-      {image: jollofImg, name: "Jollof Rice", description: "blahaskhasgklakjsgoiqwlkkjjahslkasghjajksj",},
-      {image: jollofImg, name: "Jollof Rice", description: "blahaskhasgklakjsgoiqwlkkjjahslkasghjajksj",},
-      {image: jollofImg, name: "Jollof Rice", description: "blahaskhasgklakjsgoiqwlkkjjahslkasghjajksj",},
-      {image: jollofImg, name: "Jollof Rice", description: "blahaskhasgklakjsgoiqwlkkjjahslkasghjajksj",},
-      {image: jollofImg, name: "Jollof Rice", description: "blahaskhasgklakjsgoiqwlkkjjahslkasghjajksj",},
-      {image: jollofImg, name: "Jollof Rice", description: "blahaskhasgklakjsgoiqwlkkjjahslkasghjajksj",},
-      {image: jollofImg, name: "Jollof Rice", description: "blahaskhasgklakjsgoiqwlkkjjahslkasghjajksj",},
-      {image: jollofImg, name: "Jollof Rice", description: "blahaskhasgklakjsgoiqwlkkjjahslkasghjajksj",},
-      {image: jollofImg, name: "Jollof Rice", description: "blahaskhasgklakjsgoiqwlkkjjahslkasghjajksj",},
-      {image: jollofImg, name: "Jollof Rice", description: "blahaskhasgklakjsgoiqwlkkjjahslkasghjajksj",}
-    ]
-    console.log(data)
+  const data = [
+    {image: jollofImg, name: "Italian Burata Pizza", description: "Pizza is a traditional Italian dish typically consisting of a flat base of", ingredients: "Mushrooms , Bell Peppers , Onions , Italian Sausage , Olives , Fresh Basil , Fresh Mozzarella", price: "$12.00", quantity: 10, category: "Pizza, Snack"},
+    {image: jollofImg, name: "Jollof Rice", description: "blahaskhasgklakjsgoiqwlkkjjahslkasghjajksj",},
+    // ... other data items
+  ]
 
   const handleEdit = (row, index) => {
     navigate(`/admin/menu/edit/${index}`, { state: row });
@@ -44,53 +37,58 @@ export default function AllMenu() {
   const headings = ['image', 'name', 'description', 'ingredients', 'price', 'quantity', 'Categories'];
 
   const [currentPage, setCurrentPage] = useState(1);
-    const [rowsPerPage, setRowsPerPage] = useState(25);
-    const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-    const [searchQuery, setSearchQuery] = useState('');
+  const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [searchQuery, setSearchQuery] = useState('');
   
-    // Filter data by search
-    const filteredData = useMemo(() => {
-      if (!searchQuery) return data;
-      return data.filter((item) =>
-        headings.some((key) =>
-          String(item[key]).toLowerCase().includes(searchQuery.toLowerCase())
-        )
-      );
-    }, [searchQuery, data, headings]);
+  // Filter data by search
+  const filteredData = useMemo(() => {
+    if (!searchQuery) return data;
+    return data.filter((item) =>
+      headings.some((key) =>
+        String(item[key]).toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    );
+  }, [searchQuery, data, headings]);
   
-    // Sort data
-    const sortedData = useMemo(() => {
-      if (!sortConfig.key) return filteredData;
-      const sorted = [...filteredData].sort((a, b) => {
-        const aVal = a[sortConfig.key];
-        const bVal = b[sortConfig.key];
+  // Sort data
+  const sortedData = useMemo(() => {
+    if (!sortConfig.key) return filteredData;
+    const sorted = [...filteredData].sort((a, b) => {
+      const aVal = a[sortConfig.key];
+      const bVal = b[sortConfig.key];
   
-        if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
-        return 0;
-      });
-      return sorted;
-    }, [filteredData, sortConfig]);
+      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return sorted;
+  }, [filteredData, sortConfig]);
   
-    // Pagination
-    const totalPages = Math.ceil(sortedData.length / rowsPerPage);
-    const startIndex = (currentPage - 1) * rowsPerPage;
-    const currentRows = sortedData.slice(startIndex, startIndex + rowsPerPage);
+  // Pagination
+  const totalPages = Math.ceil(sortedData.length / rowsPerPage);
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const currentRows = sortedData.slice(startIndex, startIndex + rowsPerPage);
   
-    // Handle sort toggle
-    const handleSort = (key) => {
-      setSortConfig((prev) => ({
-        key,
-        direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
-      }));
-    };
+  // Handle sort toggle
+  const handleSort = (key) => {
+    setSortConfig((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  };
   
-    // Handle rows per page change
-    const handleRowsPerPageChange = (e) => {
-      setRowsPerPage(parseInt(e.target.value));
-      setCurrentPage(1);
-    };
+  // Handle rows per page change
+  const handleRowsPerPageChange = (e) => {
+    setRowsPerPage(parseInt(e.target.value));
+    setCurrentPage(1);
+  };
 
+  // Function to format ingredients by removing commas
+  const formatIngredients = (ingredients) => {
+    if (!ingredients) return "-";
+    return ingredients.replace(/, /g, ' ');
+  };
 
   return (
     <>
@@ -129,9 +127,7 @@ export default function AllMenu() {
 
             {/* Table */}
             <div className="overflow-x-auto">
-              <table className=" border border-own-2">
-
-                
+              <table className="border border-own-2">
                 <thead>
                   <tr className="bg-own-2 text-black">
                     <th className="px-4 py-2 border-b">IMAGE</th>
@@ -149,7 +145,12 @@ export default function AllMenu() {
                 <tbody className="bg-black">
                   {currentRows.length > 0 ? (
                     currentRows.map((row, rowIndex) => (
-                      <tr key={rowIndex} className="hover:bg-own-1">
+                      <tr 
+                        key={rowIndex} 
+                        className="hover:bg-own-1 relative"
+                        onMouseEnter={() => setHoveredRow(rowIndex)}
+                        onMouseLeave={() => setHoveredRow(null)}
+                      >
                         {/* IMAGE */}
                         <td className="px-4 py-3 border-b-2 border-own-2">
                           <div className="flex justify-center">
@@ -168,12 +169,28 @@ export default function AllMenu() {
 
                         {/* DESCRIPTION */}
                         <td className="px-4 py-3 border-b-2 border-own-2 text-own-2 font-display text-left max-w-xs truncate">
-                          {row.description || "-"}
+                          {hoveredRow === rowIndex ? (
+                            <div className="whitespace-normal break-words">
+                              {row.description || "-"}
+                            </div>
+                          ) : (
+                            <div className="truncate">
+                              {row.description || "-"}
+                            </div>
+                          )}
                         </td>
 
                         {/* INGREDIENTS */}
                         <td className="px-4 py-3 border-b-2 border-own-2 text-own-2 font-display text-left max-w-xs truncate">
-                          {row.ingredients || "-"}
+                          {hoveredRow === rowIndex ? (
+                            <div className="whitespace-normal break-words">
+                              {formatIngredients(row.ingredients)}
+                            </div>
+                          ) : (
+                            <div className="truncate">
+                              {row.ingredients || "-"}
+                            </div>
+                          )}
                         </td>
 
                         {/* PRICE */}

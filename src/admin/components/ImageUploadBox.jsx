@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { faCloudUpload, faPoundSign } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
-const ImageUploadBox = ({ onImageSelect }) => {
+const ImageUploadBox = ({ onImageSelect, page }) => {
   const [imagePreview, setImagePreview] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
@@ -49,7 +49,7 @@ const ImageUploadBox = ({ onImageSelect }) => {
 
   return (
     <div className="flex flex-col w-full md:w-[50%] mb-14">
-      <h2 className='text-left w-full text-2xl mb-5 font-semibold font-display2'>Product Photo</h2>
+      <h2 className='text-left w-full text-2xl mb-5 font-semibold font-display2'>{page} Photo</h2>
       <div
         onClick={handleBoxClick}
         onDragOver={handleDragOver}
@@ -83,9 +83,7 @@ const ImageUploadBox = ({ onImageSelect }) => {
           onChange={handleFileInputChange}
         />
       </div>
-      <p className='hidden md:block pt-10 font-display2 '>Note: <br />1. When using Pc hold down control key to select multiple Categories <br />
-      2. All Ingredients should be separated with a comma <br />
-      3. Each price should be entered in Pounds (<FontAwesomeIcon icon={faPoundSign} className='text-sm'/>)</p>
+      <p className='hidden md:block pt-10 font-display2 '>Note: <br />When using PC hold down control key to select inputs with multiple choices <br /> </p>
     </div>
   );
 };

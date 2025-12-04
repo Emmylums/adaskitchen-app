@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Link } from "react-router-dom";
 import {Element} from 'react-scroll';
-import { faBars, faBell } from "@fortawesome/free-solid-svg-icons";
+import { faBars, faBell, faCog, faSearch } from "@fortawesome/free-solid-svg-icons";
 import boy from "../../assets/girl.png";
 
 const AdminNavBar = ({toggleSidebar, isSideBarOpen}) => {
@@ -44,19 +44,26 @@ const AdminNavBar = ({toggleSidebar, isSideBarOpen}) => {
     return(
             <Element name="top">
               <div className="md:flex md:justify-end">
-                <header className={`select-none w-full flex justify-between items-center transition-all duration-100 ease-in z-40 lg:px-10 px-5 text-white bg-black py-5 shadow-lg fixed ${isSideBarOpen ? "md:w-[75%] lg:w-[80%]" : "md:w-full"} transition-all duration-300 ease-in-out`}>
+                <header className={`select-none w-full flex justify-between items-center transition-all duration-100 ease-in z-40 lg:px-10 px-5 text-own-2 bg-white py-5 shadow-sm fixed ${isSideBarOpen ? "md:w-[70%] lg:w-[75%]" : "md:w-full"} transition-all duration-300 ease-in-out`}>
                     <div className="">
-                        <button className="text-white text-3xl" onClick={toggleSidebar}>
+                        <button className="text-own-2 text-3xl" onClick={toggleSidebar}>
                             <FontAwesomeIcon icon={faBars}/>
                         </button>
                     </div>
-                    <div className="flex items-center gap-5">
-                        <div className="w-12 h-12 border-2 rounded-full flex items-center justify-center">
-                            <h3><FontAwesomeIcon icon={faBell} className="text-white text-2xl"/></h3>
-                        </div>
-                        <div className="w-12 h-12 bg-own-2 rounded-full p-2">
-                            <img src={boy} alt="" className="object-cover rounded-full"/>
-                        </div>
+                    <div className="flex items-center gap-4">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="Search..."
+                          className="pl-10 pr-4 py-2 border border-own-2 rounded-xl focus:ring-2 focus:ring-amber-600 focus:border-amber-600"
+                          // value={searchTerm}
+                          // onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                        <FontAwesomeIcon icon={faSearch} className="absolute left-3 top-3 text-own-2" />
+                      </div>
+                      <button className="p-2 rounded-lg hover:bg-amber-060">
+                        <FontAwesomeIcon icon={faCog} className="text-own-2" />
+                      </button>
                     </div>
                 </header>
               </div>

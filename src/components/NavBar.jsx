@@ -44,9 +44,10 @@ const NavBar = ({onToggleMobileNavBar, activeLink}) => {
     
     const menuItems = [
         { name: "Home"},
-        { name: "Our Story"},
         { name: "Menu"},
-        { name: "Contact Us "},
+        { name: "Our Story"},
+        { name: "Catering"},
+        { name: "Cart"},
         { name: "Login"},
     ];
 
@@ -64,7 +65,7 @@ const NavBar = ({onToggleMobileNavBar, activeLink}) => {
                     </div>
                     <nav className="sm:flex landscape:flex lg:space-x-6 sm:space-x-1 landscape:space-x-1 landscape:text-sm md:text-xl landscape:lg:text-xl font-bold hidden tracking-wide">
                         {menuItems.map((item) => (
-                            <Link to={`/${item.name}`} key={item.name} smooth="true" duration={700} onClick={action}><p className={`hover:text-own-2  pt-2 px-2 pb-1.5 transition duration-500 ease-in-out cursor-pointer ${
+                            <Link to={`/${item.name}`} key={item.name} smooth="true" duration={700} onClick={action}><p className={`hover:text-own-2  pt-2 px-2 pb-1.5 transition duration-500 ease-in-out cursor-pointer text-nowrap ${
                                 activeTab === item.name
                                 ? " border-b-2 text-own-2"
                                 : ""

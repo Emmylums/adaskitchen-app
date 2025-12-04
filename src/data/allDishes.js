@@ -14,6 +14,7 @@ const allDishes = [
     image: jollofImg,
     rating: 5,
     stock: 10,
+    category: "Full Meal"
   },
   {
     id: 2,
@@ -23,6 +24,7 @@ const allDishes = [
     image: egusiImg,
     rating: 4,
     stock: 8,
+    category: "Soup"
   },
   {
     id: 3,
@@ -32,6 +34,7 @@ const allDishes = [
     image: suyaImg,
     rating: 5,
     stock: 5,
+    category: "Protein"
   },
   {
     id: 4,
@@ -41,6 +44,7 @@ const allDishes = [
     image: pepperSoupImg,
     rating: 4,
     stock: 12,
+    category: "Soup"
   },
   {
     id: 5,
@@ -50,6 +54,7 @@ const allDishes = [
     image: moimoiImg,
     rating: 3,
     stock: 15,
+    category: "Full Meal"
   },
   {
     id: 6,
@@ -59,6 +64,7 @@ const allDishes = [
     image: yamPorridgeImg,
     rating: 4,
     stock: 9,
+    category: "Full Meal"
   },
 ];
 

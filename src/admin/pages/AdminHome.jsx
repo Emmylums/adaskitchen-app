@@ -1,6 +1,5 @@
 import React from "react";
 import ManagerDashboard from "./ManagerDashboard";
-import EmployeeDashboard from "./EmployeeDashboard";
 import { useAuth } from "../../context/AuthContext";
 
 export default function AdminHome() {
@@ -8,7 +7,7 @@ export default function AdminHome() {
 
   return (
     <>
-      {userRole === "manager" ? <ManagerDashboard /> : <EmployeeDashboard />}
+      {userRole === "manager" ? <ManagerDashboard /> : ""}
     </>
   );
 }

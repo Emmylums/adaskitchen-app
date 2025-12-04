@@ -7,45 +7,36 @@ function Footer(){
     return (
         <>
             <footer className="bg-black px-7 pt-10 pb-4 flex flex-col border-t">
-                <section className="flex flex-col text-base/loose gap-7 pb-10">
+                <section className="flex flex-col md:items-center text-base/loose gap-7 pb-10">
                     <section className="z-30">
-                        <h2 className="font-semibold pb-2">Quick Links</h2>
-                        <nav className="flex flex-col">
-                            <Link to="/AboutUs">About Ada's Kitchen</Link>
-                            <Link to="/Services?category=Courses#top">Careers</Link>
-                            <Link to="/Services?category=Services#top">Services</Link>
+                        <h2 className="font-semibold pb-2 md:text-center md:text-xl">Quick Links</h2>
+                        <nav className="flex flex-col md:flex-row gap-5 md:text-xl">
+                            <Link to="/Our Story">About Ada's Kitchen</Link>
+                            <Link to="/Contact Us">Contact Us</Link>
+                            <Link to="/Signup">Sign Up</Link>
                             <Link to="/Login">Login</Link>
                         </nav>
                     </section>
-                    {/* <section className="">
-                        <h2 className="font-semibold pb-2">Trending Courses</h2>
-                        <nav className="flex flex-col">
-                            <Link to={`/Courses/Project Management`}>Project Management</Link>
-                            <Link to={`/Courses/Digital Marketing`}>Digital Marketing</Link>
-                            <Link to={`/Courses/Product Management`}>Product Management</Link>
-                            <Link to={`/Courses/Customer Service Representative`}>Customer Service Representative</Link>
-                        </nav>
-                    </section> */}
                     <section className="z-30">
-                        <h2 className="font-semibold pb-2">Support</h2>
-                        <nav className="flex flex-col">
-                            <Link to="/ContactUs">Contact Us By Email</Link>
+                        <h2 className="font-semibold pb-2 md:text-center md:text-xl">Contact / Support</h2>
+                        <nav className="flex flex-col md:flex-row gap-5 md:text-xl">
+                            <Link to="/Contact Us">Contact Us</Link>
                             <a href="tel:+2349124354006">Phone</a>
                             <a>
-                                <button>
-                                    Customer Support
+                                <button className="hover:cursor-pointer">
+                                    Whatsapp
                                 </button>
                             </a>
-                            <Link to="/AboutUs#faq">FAQ</Link>
+                            <Link to="/Our Story#faq">FAQ</Link> {/* Changed this line */}
                         </nav>
                     </section>
                 </section>
-                <section className="flex flex-col text-base">
+                <section className="flex flex-col text-base items-center">
                     <section className="flex flex-col z-30">
                         <div>
-                            <p>Follow Us On Our Socials Below</p>
+                            <p className="md:text-xl">Follow Us On Our Socials Below</p>
                         </div>
-                        <div className="flex gap-7 text-2xl pt-4">
+                        <div className="flex gap-7 text-2xl pt-4 items-center justify-center">
                             <a href="https://www.facebook.com/share/1B7PCprqon/" target="_blank"><FontAwesomeIcon icon={faFacebook}></FontAwesomeIcon></a>
                             <a href="https://www.instagram.com/grow_16withalerah?igsh=NmtzdXg5cGNuYnp2" target="_blank"><FontAwesomeIcon icon={faInstagram}></FontAwesomeIcon></a>
                             <a href="https://www.linkedin.com/company/grow-with-alerah/" target="_blank"><FontAwesomeIcon icon={faLinkedin}></FontAwesomeIcon></a>

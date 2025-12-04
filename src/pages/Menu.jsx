@@ -4,7 +4,7 @@ import NavBar from "../components/NavBar";
 import MobileNavBar from "../components/MobileNavBar";
 import { motion, useInView } from 'framer-motion';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSearch, faShoppingCart, faPlus, faMinus } from "@fortawesome/free-solid-svg-icons";
+import { faSearch, faShoppingCart, faPlus, faMinus, faFilter } from "@fortawesome/free-solid-svg-icons";
 import AlertBanner from "../components/AlertBanner";
 import { useCart } from "../context/CartContext";
 import allDishes from "../data/alldishes";
@@ -13,15 +13,23 @@ import Footer from "../components/Footer";
 export default function Menu() {
   const [mobileNavBarVisible, setMobileNavBarVisible] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
   const [alert, setAlert] = useState({ message: "", type: "", visible: false });
 
   const { addToCart, getTotalItems } = useCart();
 
-  const filteredItems = searchTerm.trim()
-    ? allDishes.filter(item =>
-        item.name.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    : allDishes;
+  // Get unique categories
+  const categories = ["All", ...new Set(allDishes.map(item => item.category))];
+
+  const filteredItems = allDishes.filter(item => {
+    const matchesSearch = searchTerm.trim() === "" || 
+      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.description.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesCategory = selectedCategory === "All" || item.category === selectedCategory;
+    
+    return matchesSearch && matchesCategory;
+  });
 
   const [quantities, setQuantities] = useState(
     allDishes.reduce((acc, item) => ({ ...acc, [item.id]: 1 }), {})
@@ -63,7 +71,6 @@ export default function Menu() {
     const quantity = quantities[item.id];
     addToCart(item, quantity);
     showAlert(`${quantity} ${item.name} added to cart!`, "success");
-
     setQuantities(prev => ({ ...prev, [item.id]: 1 }));
   };
 
@@ -75,10 +82,10 @@ export default function Menu() {
     ));
   };
 
-  const columns = window.innerWidth >= 1024 ? 3 : window.innerWidth >= 768 ? 2 : 1;
+  // Simple grouping for grid layout
   const rows = [];
-  for (let i = 0; i < filteredItems.length; i += columns) {
-    rows.push(filteredItems.slice(i, i + columns));
+  for (let i = 0; i < filteredItems.length; i += 3) {
+    rows.push(filteredItems.slice(i, i + 3));
   }
 
   return (
@@ -115,39 +122,80 @@ export default function Menu() {
           </div>
         </section>
 
-        {/* Search Bar */}
-        <div className="max-w-4xl mx-auto pt-12 px-4 sm:px-6 lg:px-8 text-white">
-          <div className="flex justify-center">
-            <div className="relative w-full md:w-2/3">
+        {/* Search Bar and Category Filter */}
+        <div className="max-w-6xl mx-auto pt-12 px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-row gap-4 justify-center items-center">
+            {/* Search Input */}
+            <div className="relative w-2/3">
               <input
                 type="text"
                 placeholder="Search for dishes..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-6 py-4 pr-14 rounded-full border border-own-2 focus:ring-own-2 focus:ring-2 text-lg shadow-md placeholder:text-white"
+                className="w-full px-6 py-4 pr-14 rounded-full border border-own-2 focus:ring-own-2 focus:ring-2 text-lg shadow-md placeholder:text-own-2 text-own-2"
               />
               <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
                 <FontAwesomeIcon icon={faSearch} className="w-5 h-5" />
               </div>
             </div>
+
+            {/* Category Dropdown */}
+            <div className="relative w-1/3">
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="w-full px-6 py-4 pr-10 rounded-full border border-own-1 focus:ring-own-1 focus:ring-2 text-lg shadow-md appearance-none bg-own-2 cursor-pointer"
+              >
+                {categories.map(category => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
+                <FontAwesomeIcon icon={faFilter} className="w-5 h-5" />
+              </div>
+            </div>
+          </div>
+
+          {/* Results Count */}
+          <div className="text-center mt-4 text-gray-600">
+            Showing {filteredItems.length} item{filteredItems.length !== 1 ? 's' : ''}
+            {selectedCategory !== "All" && ` in ${selectedCategory}`}
+            {searchTerm && ` matching "${searchTerm}"`}
           </div>
         </div>
 
         {/* Menu Items */}
-        <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-          {rows.map((row, index) => (
-            <RowWithAnimation
-              key={index}
-              row={row}
-              quantities={quantities}
-              increaseQuantity={increaseQuantity}
-              decreaseQuantity={decreaseQuantity}
-              handleInputChange={handleInputChange}
-              handleInputBlur={handleInputBlur}
-              handleAddToCart={handleAddToCart}
-              renderStars={renderStars}
-            />
-          ))}
+        <div className="max-w-7xl mx-auto pt-4 pb-8 px-4 sm:px-6 lg:px-8">
+          {rows.length > 0 ? (
+            rows.map((row, index) => (
+              <RowWithAnimation
+                key={index}
+                row={row}
+                quantities={quantities}
+                increaseQuantity={increaseQuantity}
+                decreaseQuantity={decreaseQuantity}
+                handleInputChange={handleInputChange}
+                handleInputBlur={handleInputBlur}
+                handleAddToCart={handleAddToCart}
+                renderStars={renderStars}
+              />
+            ))
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-xl text-gray-500">No dishes found matching your criteria.</p>
+              <button
+                onClick={() => {
+                  setSearchTerm("");
+                  setSelectedCategory("All");
+                }}
+                className="mt-4 bg-own-2 text-white px-6 py-2 rounded-full hover:bg-own-2/90 transition"
+              >
+                Clear Filters
+              </button>
+            </div>
+          )}
         </div>
       </div>
       <Footer/>
@@ -169,13 +217,12 @@ function RowWithAnimation({
   const isInView = useInView(ref, { once: true, margin: "-100px" });
 
   return (
-    <>
     <motion.div
       ref={ref}
       initial={{ opacity: 0, y: 50 }}
       animate={isInView ? { opacity: 1, y: 0 } : {}}
       transition={{ duration: 0.8 }}
-      className="grid gap-10 pt-10 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 landscape:md:grid-cols-2 landscape:lg:grid-cols-3"
+      className="grid gap-10 pt-10 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 landscape:grid-cols-2 landscape:lg:grid-cols-3"
     >
       {row.map((item, itemIndex) => (
         <motion.div
@@ -189,8 +236,11 @@ function RowWithAnimation({
           <div className="p-6">
             <h3 className="text-xl font-bold text-own-2 mb-2">{item.name}</h3>
             <p className="text-gray-700 mb-2">{item.description}</p>
-            <div className="flex items-center mb-2">{renderStars(item.rating)}</div>
-            <p className="text-sm text-gray-600 mb-4">In stock: {item.stock - (quantities[item.id] ?? 0)}</p>
+            <div className="flex items-center mb-2">
+              {renderStars(item.rating)}
+              <span className="ml-2 text-sm text-gray-500">({item.rating})</span>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">In stock: {item.stock}</p>
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-3">
                 <button onClick={() => decreaseQuantity(item.id)} className="bg-own-2 text-white p-2 rounded-full z-30">
@@ -199,6 +249,7 @@ function RowWithAnimation({
                 <input
                   type="number"
                   min="1"
+                  max={item.stock}
                   value={quantities[item.id]}
                   onChange={(e) => handleInputChange(e, item.id, item.stock)}
                   onBlur={() => handleInputBlur(item.id)}
@@ -212,7 +263,7 @@ function RowWithAnimation({
                   <FontAwesomeIcon icon={faPlus} />
                 </button>
               </div>
-              <span className="text-lg font-semibold text-gray-800">₦{item.price.toLocaleString()}</span>
+              <span className="text-lg font-semibold text-gray-800">£{item.price.toFixed(2)}</span>
             </div>
             <div className="flex justify-center">
               <button
@@ -226,7 +277,5 @@ function RowWithAnimation({
         </motion.div>
       ))}
     </motion.div>
-    {/* <Footer/> */}
-    </>
   );
 }
