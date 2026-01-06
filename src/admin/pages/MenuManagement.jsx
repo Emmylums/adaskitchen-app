@@ -1,8 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AdminSideBar from '../components/AdminSidebar';
 import AdminNavBar from '../components/AdminNavbar';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faChevronDown, faDollarSign, faEdit, faPlus, faSearch, faShoppingCart, faStar, faTimes, faTrash, faUser, faUtensils } from '@fortawesome/free-solid-svg-icons';
+import { 
+  faChevronDown, 
+  faDollarSign, 
+  faEdit, 
+  faPlus, 
+  faSearch, 
+  faShoppingCart, 
+  faStar, 
+  faTimes, 
+  faTrash, 
+  faUser, 
+  faUtensils,
+  faSpinner,
+  faFire,
+  faLeaf,
+  faClock
+} from '@fortawesome/free-solid-svg-icons';
+import { 
+  collection, 
+  getDocs, 
+  query, 
+  orderBy, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc,
+  serverTimestamp 
+} from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db, storage } from "../../firebaseConfig";
 
 export default function MenuManagement() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -10,463 +39,732 @@ export default function MenuManagement() {
   const toggleSidebars = () => {
     setIsSidebarOpen(prev => !prev);
   };
+  
   const [searchTerm, setSearchTerm] = useState("");
-    const [selectedCategory, setSelectedCategory] = useState("all");
-    const [expandedItem, setExpandedItem] = useState(null);
-
+  const [selectedCategory, setSelectedCategory] = useState("all");
   const [activeTab, setActiveTab] = useState("Menu");
-  // Mock user data
-  const userData = {
-    name: "Ada Johnson",
-    email: "ada.johnson@email.com",
-    position: "Manager",
-    phone: "+234 912 345 6789",
-    joinDate: "January 2024",
-    lastLogin: "2024-01-15 14:30",
-    loginLocation: "Lagos, Nigeria",
-    walletBalance: 12500
+  
+  // State for Firebase data
+  const [menuItems, setMenuItems] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  
+  // Form states
+  const [menuForm, setMenuForm] = useState({
+    name: "",
+    description: "",
+    price: "",
+    category: "",
+    ingredients: [""],
+    preparationTime: 30,
+    isVegetarian: false,
+    isSpicy: false,
+    isFeatured: false,
+    calories: 0,
+    image: null,
+    imagePreview: "",
+    available: true
+  });
+  
+  // Modal states
+  const [showMenuModal, setShowMenuModal] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+
+  // Fetch data from Firebase
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch menu items
+      const menuQuery = query(collection(db, "menus"), orderBy("createdAt", "desc"));
+      const menuSnapshot = await getDocs(menuQuery);
+      const menuList = menuSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setMenuItems(menuList);
+
+      // Fetch categories
+      const categoriesQuery = query(collection(db, "categories"), orderBy("displayOrder"));
+      const categoriesSnapshot = await getDocs(categoriesQuery);
+      const categoriesList = categoriesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setCategories(categoriesList);
+
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-      // Mock data for all sections
-      const menuItems = [
-        {
-          id: 1,
-          name: "Jollof Rice",
-          description: "Traditional Nigerian rice cooked in tomato and pepper sauce",
-          price: 3000,
-          category: "Main Course",
-          image: "/api/placeholder/300/200",
-          featured: true,
-          available: true,
-          ingredients: ["Rice", "Tomatoes", "Bell peppers", "Onions", "Spices"],
-          preparationTime: 30
-        },
-        {
-          id: 2,
-          name: "Suya",
-          description: "Spicy grilled meat skewers",
-          price: 2500,
-          category: "Appetizer",
-          image: "/api/placeholder/300/200",
-          featured: true,
-          available: true,
-          ingredients: ["Beef", "Suya spice", "Onions", "Tomatoes"],
-          preparationTime: 20
-        },
-        {
-          id: 3,
-          name: "Pounded Yam & Egusi",
-          description: "Yam flour with melon seed soup",
-          price: 3500,
-          category: "Main Course",
-          image: "/api/placeholder/300/200",
-          featured: false,
-          available: true,
-          ingredients: ["Yam flour", "Melon seeds", "Vegetables", "Meat"],
-          preparationTime: 45
-        }
-      ];
-  
-      const categories = [
-        { id: 1, name: "Appetizer", description: "Starters and small bites", itemCount: 5, active: true },
-        { id: 2, name: "Main Course", description: "Main dishes and entrees", itemCount: 12, active: true },
-        { id: 3, name: "Desserts", description: "Sweet treats and desserts", itemCount: 3, active: true },
-        { id: 4, name: "Drinks", description: "Beverages and drinks", itemCount: 8, active: true }
-      ];
-  
-      const cateringPackages = [
-        {
-          id: 1,
-          name: "Standard Package",
-          description: "Perfect for small gatherings",
-          price: 25000,
-          includes: ["Jollof Rice", "Fried Rice", "Chicken", "Salad", "Drinks"],
-          minGuests: 10,
-          maxGuests: 50,
-          active: true
-        },
-        {
-          id: 2,
-          name: "Premium Package",
-          description: "Ideal for corporate events",
-          price: 50000,
-          includes: ["All Standard items", "Suya", "Small chops", "Dessert", "Premium drinks"],
-          minGuests: 50,
-          maxGuests: 200,
-          active: true
-        }
-      ];
-  
-      const orders = [
-        {
-          id: "ORD-001",
-          customer: "Ada Johnson",
-          date: "2024-01-15",
-          items: [
-            { name: "Jollof Rice", price: 3000, quantity: 2 },
-            { name: "Suya", price: 2500, quantity: 1 }
-          ],
-          total: 8500,
-          status: "completed",
-          paymentMethod: "Card",
-          deliveryAddress: "123 Main Street, Lagos"
-        },
-        {
-          id: "ORD-002",
-          customer: "John Smith",
-          date: "2024-01-14",
-          items: [
-            { name: "Pounded Yam & Egusi", price: 3500, quantity: 1 }
-          ],
-          total: 3500,
-          status: "preparing",
-          paymentMethod: "Wallet",
-          deliveryAddress: "456 Oak Avenue, Lagos"
-        }
-      ];
-  
-      const invoices = [
-        {
-          id: "INV-001",
-          orderId: "ORD-001",
-          customer: "Ada Johnson",
-          date: "2024-01-15",
-          amount: 8500,
-          status: "paid",
-          dueDate: "2024-01-15"
-        }
-      ];
-  
-      const galleryImages = [
-        { id: 1, url: "/api/placeholder/300/200", caption: "Jollof Rice", category: "Food" },
-        { id: 2, url: "/api/placeholder/300/200", caption: "Restaurant Interior", category: "Ambiance" },
-        { id: 3, url: "/api/placeholder/300/200", caption: "Customer Event", category: "Events" }
-      ];
-  
-      // Form states
-      const [menuForm, setMenuForm] = useState({
-        name: "",
-        description: "",
-        price: "",
-        category: "",
-        ingredients: "",
-        preparationTime: ""
+  // Upload image to Firebase Storage
+  const uploadImage = async (file) => {
+    try {
+      const storageRef = ref(storage, `menu/${Date.now()}_${file.name}`);
+      const snapshot = await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+      return downloadURL;
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      throw error;
+    }
+  };
+
+  // Handle menu submission
+  const handleMenuSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    
+    try {
+      let imageUrl = '';
+      
+      // Upload image if provided
+      if (menuForm.image) {
+        imageUrl = await uploadImage(menuForm.image);
+      }
+
+      const menuData = {
+        name: menuForm.name,
+        description: menuForm.description,
+        price: parseFloat(menuForm.price),
+        category: menuForm.category,
+        ingredients: menuForm.ingredients.filter(ing => ing.trim() !== ''),
+        preparationTime: parseInt(menuForm.preparationTime),
+        isVegetarian: menuForm.isVegetarian,
+        isSpicy: menuForm.isSpicy,
+        isFeatured: menuForm.isFeatured,
+        calories: parseInt(menuForm.calories) || 0,
+        available: menuForm.available,
+        imageUrl: imageUrl || '/api/placeholder/300/200',
+        createdAt: editingItem ? menuForm.createdAt : serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+
+      if (editingItem) {
+        // Update existing menu item
+        await updateDoc(doc(db, "menus", editingItem.id), menuData);
+      } else {
+        // Add new menu item
+        await addDoc(collection(db, "menus"), menuData);
+      }
+
+      // Reset form and close modal
+      resetMenuForm();
+      setShowMenuModal(false);
+      
+      // Refresh data
+      fetchData();
+      
+    } catch (error) {
+      console.error("Error saving menu item:", error);
+      alert("Failed to save menu item. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Handle edit menu item
+  const handleEditMenu = (item) => {
+    setEditingItem(item);
+    setMenuForm({
+      name: item.name,
+      description: item.description,
+      price: item.price.toString(),
+      category: item.category || "",
+      ingredients: item.ingredients || [""],
+      preparationTime: item.preparationTime || 30,
+      isVegetarian: item.isVegetarian || false,
+      isSpicy: item.isSpicy || false,
+      isFeatured: item.isFeatured || false,
+      calories: item.calories || 0,
+      image: null,
+      imagePreview: item.imageUrl || "",
+      available: item.available !== false,
+      createdAt: item.createdAt
+    });
+    setShowMenuModal(true);
+  };
+
+  // Handle delete menu item
+  const handleDeleteMenu = async (id) => {
+    if (window.confirm("Are you sure you want to delete this menu item?")) {
+      try {
+        await deleteDoc(doc(db, "menus", id));
+        fetchData();
+      } catch (error) {
+        console.error("Error deleting menu item:", error);
+        alert("Failed to delete menu item. Please try again.");
+      }
+    }
+  };
+
+  // Toggle featured status
+  const toggleFeatured = async (item) => {
+    try {
+      await updateDoc(doc(db, "menus", item.id), {
+        isFeatured: !item.isFeatured,
+        updatedAt: serverTimestamp()
       });
-  
-      const [categoryForm, setCategoryForm] = useState({
-        name: "",
-        description: ""
-      });
-  
-      const [packageForm, setPackageForm] = useState({
-        name: "",
-        description: "",
-        price: "",
-        minGuests: "",
-        maxGuests: "",
-        includes: ""
-      });
-  
-      const [orderForm, setOrderForm] = useState({
-        customer: "",
-        items: [],
-        deliveryAddress: "",
-        paymentMethod: ""
-      });
-  
-      // Modal states
-      const [showMenuModal, setShowMenuModal] = useState(false);
-      const [showCategoryModal, setShowCategoryModal] = useState(false);
-      const [showPackageModal, setShowPackageModal] = useState(false);
-      const [showOrderModal, setShowOrderModal] = useState(false);
-      const [editingItem, setEditingItem] = useState(null);
-  
-      // Handlers
-      const handleMenuSubmit = (e) => {
-        e.preventDefault();
-        // Handle menu item creation/editing
-        console.log("Menu form submitted:", menuForm);
-        setShowMenuModal(false);
-        setMenuForm({ name: "", description: "", price: "", category: "", ingredients: "", preparationTime: "" });
-        setEditingItem(null);
-      };
-  
-      const handleCategorySubmit = (e) => {
-        e.preventDefault();
-        // Handle category creation/editing
-        console.log("Category form submitted:", categoryForm);
-        setShowCategoryModal(false);
-        setCategoryForm({ name: "", description: "" });
-        setEditingItem(null);
-      };
-  
-      const handlePackageSubmit = (e) => {
-        e.preventDefault();
-        // Handle package creation/editing
-        console.log("Package form submitted:", packageForm);
-        setShowPackageModal(false);
-        setPackageForm({ name: "", description: "", price: "", minGuests: "", maxGuests: "", includes: "" });
-        setEditingItem(null);
-      };
-  
-      const handleOrderSubmit = (e) => {
-        e.preventDefault();
-        // Handle order creation/editing
-        console.log("Order form submitted:", orderForm);
-        setShowOrderModal(false);
-        setOrderForm({ customer: "", items: [], deliveryAddress: "", paymentMethod: "" });
-        setEditingItem(null);
-      };
-  
-      const toggleFeatured = (itemId) => {
-        // Toggle featured status
-        console.log("Toggle featured:", itemId);
-      };
-  
-      const deleteItem = (itemId, type) => {
-        if (window.confirm(`Are you sure you want to delete this ${type}?`)) {
-          console.log(`Delete ${type}:`, itemId);
-        }
-      };
-  
-      const createInvoice = (orderId) => {
-        console.log("Create invoice for:", orderId);
-      };
-  
-      const printInvoice = (invoiceId) => {
-        console.log("Print invoice:", invoiceId);
-        // In real implementation, this would generate PDF
-      };
-  
+      fetchData();
+    } catch (error) {
+      console.error("Error updating featured status:", error);
+    }
+  };
+
+  // Reset menu form
+  const resetMenuForm = () => {
+    setMenuForm({
+      name: "",
+      description: "",
+      price: "",
+      category: "",
+      ingredients: [""],
+      preparationTime: 30,
+      isVegetarian: false,
+      isSpicy: false,
+      isFeatured: false,
+      calories: 0,
+      image: null,
+      imagePreview: "",
+      available: true
+    });
+    setEditingItem(null);
+  };
+
+  // Add ingredient field
+  const addIngredient = () => {
+    setMenuForm({
+      ...menuForm,
+      ingredients: [...menuForm.ingredients, ""]
+    });
+  };
+
+  // Remove ingredient field
+  const removeIngredient = (index) => {
+    const newIngredients = menuForm.ingredients.filter((_, i) => i !== index);
+    setMenuForm({
+      ...menuForm,
+      ingredients: newIngredients
+    });
+  };
+
+  // Update ingredient
+  const updateIngredient = (index, value) => {
+    const newIngredients = [...menuForm.ingredients];
+    newIngredients[index] = value;
+    setMenuForm({
+      ...menuForm,
+      ingredients: newIngredients
+    });
+  };
+
+  // Filter menu items based on search and category
+  const filteredMenuItems = menuItems.filter(item => {
+    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         item.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === "all" || item.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
+
   return (
     <>
       <AdminNavBar toggleSidebar={toggleSidebars} isSideBarOpen={isSidebarOpen}/>
-      <AdminSideBar isOpen={isSidebarOpen} closeSidebar={closeSidebar} userData={userData} setActiveTab={setActiveTab} activeTab={activeTab}/>
+      <AdminSideBar 
+        isOpen={isSidebarOpen} 
+        closeSidebar={closeSidebar} 
+        setActiveTab={setActiveTab} 
+        activeTab={activeTab}
+      />
       <div className='md:flex md:justify-end'>
         <div className={`pt-32 px-5 ${isSidebarOpen ? "md:w-[70%] lg:w-[75%]" : "md:w-full"} transition-all duration-500`}>
           <div>
             <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-own-2 mb-6">Menu Management</h2>
-            <button 
+              <h2 className="text-2xl font-bold text-own-2">Menu Management</h2>
+              <button 
                 onClick={() => setShowMenuModal(true)}
-                className="bg-own-2 text-white px-6 py-3 rounded-xl hover:bg-amber-600 transition-colors flex items-center gap-2 mb-6"
-            >
+                className="bg-own-2 text-white px-6 py-3 rounded-xl hover:bg-amber-600 transition-colors flex items-center gap-2"
+              >
                 <FontAwesomeIcon icon={faPlus} />
                 Add Menu Item
-            </button>
+              </button>
             </div>
 
             {/* Search and Filter */}
             <div className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="relative flex-1">
+              <div className="relative flex-1">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <FontAwesomeIcon icon={faSearch} className="text-black" />
+                  <FontAwesomeIcon icon={faSearch} className="text-black" />
                 </div>
                 <input
-                type="text"
-                placeholder="Search menu items..."
-                className="pl-10 pr-4 py-2 w-full border border-black text-black placeholder:text-black rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                  type="text"
+                  placeholder="Search menu items..."
+                  className="pl-10 pr-4 py-2 w-full border border-black text-black placeholder:text-black rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                 />
-            </div>
-            
-            <div className="relative">
+              </div>
+              
+              <div className="relative">
                 <select
-                className="appearance-none pl-3 pr-10 py-2 border border-black text-black rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="appearance-none pl-3 pr-10 py-2 border border-black text-black rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
                 >
-                <option value="all">All Categories</option>
-                {categories.map(cat => (
+                  <option value="all">All Categories</option>
+                  {categories.map(cat => (
                     <option key={cat.id} value={cat.name}>{cat.name}</option>
-                ))}
+                  ))}
                 </select>
                 <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                <FontAwesomeIcon icon={faChevronDown} className="text-black" />
+                  <FontAwesomeIcon icon={faChevronDown} className="text-black" />
                 </div>
-            </div>
+              </div>
             </div>
 
-            {/* Menu Items Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-            {menuItems.map(item => (
-                <div key={item.id} className="bg-white rounded-2xl shadow-lg overflow-hidden">
-                <div className="h-48 bg-gradient-to-br from-own-2 to-amber-400 relative">
-                    {item.featured && (
-                    <div className="absolute top-3 left-3 bg-amber-500 text-white px-2 py-1 rounded-full text-sm">
-                        <FontAwesomeIcon icon={faStar} className="mr-1" />
-                        Featured
-                    </div>
-                    )}
+            {/* Loading State */}
+            {loading ? (
+              <div className="flex justify-center items-center py-20">
+                <FontAwesomeIcon icon={faSpinner} className="text-4xl text-own-2 animate-spin" />
+                <span className="ml-3 text-gray-600">Loading menu items...</span>
+              </div>
+            ) : (
+              <>
+                {/* Menu Items Count */}
+                <div className="mb-4">
+                  <p className="text-gray-600">
+                    Showing {filteredMenuItems.length} of {menuItems.length} menu items
+                    {selectedCategory !== "all" && ` in "${selectedCategory}"`}
+                  </p>
                 </div>
-                
-                <div className="p-6">
-                    <div className="flex justify-between items-start mb-3">
-                    <h3 className="font-bold text-lg text-own-2">{item.name}</h3>
-                    <span className="font-bold text-own-2">₦{item.price.toLocaleString()}</span>
-                    </div>
-                    
-                    <p className="text-gray-600 text-sm mb-4">{item.description}</p>
-                    
-                    <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500">{item.category}</span>
-                    <div className="flex gap-2">
-                        <button 
-                        onClick={() => toggleFeatured(item.id)}
-                        className={`p-2 rounded-lg ${item.featured ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-600'} hover:bg-amber-200`}
-                        >
-                        <FontAwesomeIcon icon={faStar} />
-                        </button>
-                        <button 
-                        onClick={() => {
-                            setEditingItem(item);
-                            setMenuForm({
-                            name: item.name,
-                            description: item.description,
-                            price: item.price,
-                            category: item.category,
-                            ingredients: item.ingredients.join(', '),
-                            preparationTime: item.preparationTime
-                            });
-                            setShowMenuModal(true);
-                        }}
-                        className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200"
-                        >
-                        <FontAwesomeIcon icon={faEdit} />
-                        </button>
-                        <button 
-                        onClick={() => deleteItem(item.id, 'menu item')}
-                        className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200"
-                        >
-                        <FontAwesomeIcon icon={faTrash} />
-                        </button>
-                    </div>
-                    </div>
-                </div>
-                </div>
-            ))}
-            </div>
-        </div>
-        {/* Add Menu Item Modal */}
-        {showMenuModal && (
-            <div className={`fixed inset-0 backdrop-blur-sm bg-opacity-50 flex items-center justify-center p-4 z-50 ${isSidebarOpen ? "md:left-[30%] lg:left-[25%]" : "md:w-full"} transition-all duration-500`}>
-            <div className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+
+                {/* Menu Items Grid */}
+                {filteredMenuItems.length === 0 ? (
+                  <div className="text-center py-12 bg-gray-50 rounded-2xl">
+                    <FontAwesomeIcon icon={faUtensils} className="text-4xl text-gray-300 mb-3" />
+                    <h3 className="text-lg font-medium text-gray-600 mb-2">No menu items found</h3>
+                    <p className="text-gray-500 mb-4">
+                      {searchTerm ? `No results for "${searchTerm}"` : "No menu items yet"}
+                    </p>
+                    <button 
+                      onClick={() => setShowMenuModal(true)}
+                      className="bg-own-2 text-white px-6 py-2 rounded-xl hover:bg-amber-600 transition-colors"
+                    >
+                      Add Your First Menu Item
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+                    {filteredMenuItems.map(item => (
+                      <div key={item.id} className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300">
+                        {/* Image Section */}
+                        <div className="h-48 relative overflow-hidden bg-gradient-to-br from-own-2/20 to-amber-400/20">
+                          {item.imageUrl ? (
+                            <img 
+                              src={item.imageUrl} 
+                              alt={item.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <FontAwesomeIcon icon={faUtensils} className="text-4xl text-own-2/50" />
+                            </div>
+                          )}
+                          
+                          {/* Featured Badge */}
+                          {item.isFeatured && (
+                            <div className="absolute top-3 left-3 bg-amber-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                              <FontAwesomeIcon icon={faStar} className="mr-1" />
+                              Featured
+                            </div>
+                          )}
+                          
+                          {/* Dietary Badges */}
+                          <div className="absolute top-3 right-3 flex gap-1">
+                            {item.isVegetarian && (
+                              <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                                <FontAwesomeIcon icon={faLeaf} className="mr-1" />
+                                Veg
+                              </span>
+                            )}
+                            {item.isSpicy && (
+                              <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">
+                                <FontAwesomeIcon icon={faFire} className="mr-1" />
+                                Spicy
+                              </span>
+                            )}
+                          </div>
+                          
+                          {/* Availability Badge */}
+                          <div className="absolute bottom-3 right-3">
+                            <span className={`px-2 py-1 rounded-full text-xs ${item.available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                              {item.available ? 'Available' : 'Unavailable'}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        {/* Content Section */}
+                        <div className="p-6">
+                          <div className="flex justify-between items-start mb-3">
+                            <div>
+                              <h3 className="font-bold text-lg text-own-2">{item.name}</h3>
+                              <p className="text-sm text-gray-500">{item.category}</p>
+                            </div>
+                            <span className="font-bold text-own-2 text-lg">₦{item.price?.toLocaleString()}</span>
+                          </div>
+                          
+                          <p className="text-gray-600 text-sm mb-4 line-clamp-2">{item.description}</p>
+                          
+                          {/* Preparation Time */}
+                          {item.preparationTime && (
+                            <div className="flex items-center text-gray-500 text-sm mb-3">
+                              <FontAwesomeIcon icon={faClock} className="mr-2" />
+                              {item.preparationTime} mins
+                            </div>
+                          )}
+                          
+                          {/* Ingredients Preview */}
+                          {item.ingredients && item.ingredients.length > 0 && (
+                            <div className="mb-4">
+                              <p className="text-sm text-gray-500 mb-1">Ingredients:</p>
+                              <div className="flex flex-wrap gap-1">
+                                {item.ingredients.slice(0, 3).map((ingredient, index) => (
+                                  <span key={index} className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                                    {ingredient}
+                                  </span>
+                                ))}
+                                {item.ingredients.length > 3 && (
+                                  <span className="text-xs text-gray-500">+{item.ingredients.length - 3} more</span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Actions */}
+                          <div className="flex justify-between items-center pt-3 border-t border-gray-100">
+                            <span className="text-sm text-gray-500">
+                              {item.calories > 0 && `${item.calories} cal`}
+                            </span>
+                            <div className="flex gap-2">
+                              <button 
+                                onClick={() => toggleFeatured(item)}
+                                className={`p-2 rounded-lg ${item.isFeatured ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-600'} hover:bg-amber-200 transition-colors`}
+                                title={item.isFeatured ? "Remove from featured" : "Mark as featured"}
+                              >
+                                <FontAwesomeIcon icon={faStar} />
+                              </button>
+                              <button 
+                                onClick={() => handleEditMenu(item)}
+                                className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
+                                title="Edit menu item"
+                              >
+                                <FontAwesomeIcon icon={faEdit} />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteMenu(item.id)}
+                                className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+                                title="Delete menu item"
+                              >
+                                <FontAwesomeIcon icon={faTrash} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          
+          {/* Add/Edit Menu Item Modal */}
+          {showMenuModal && (
+            <div className={`fixed inset-0 backdrop-blur-sm bg-black/50 flex items-center justify-center p-4 z-50 ${isSidebarOpen ? "md:left-[30%] lg:left-[25%]" : "md:left-0"} transition-all duration-500`}>
+              <div className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                 <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold text-own-2">
+                  <h3 className="text-xl font-bold text-own-2">
                     {editingItem ? 'Edit Menu Item' : 'Add New Menu Item'}
-                </h3>
-                <button onClick={() => setShowMenuModal(false)} className="text-gray-400 hover:text-gray-600">
+                  </h3>
+                  <button 
+                    onClick={() => {
+                      setShowMenuModal(false);
+                      resetMenuForm();
+                    }} 
+                    className="text-gray-400 hover:text-gray-600"
+                  >
                     <FontAwesomeIcon icon={faTimes} />
-                </button>
+                  </button>
                 </div>
 
-                <form onSubmit={handleMenuSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <form onSubmit={handleMenuSubmit} className="space-y-6">
+                  {/* Image Upload */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Dish Image
+                    </label>
+                    <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-xl hover:border-own-2 transition-colors">
+                      <div className="space-y-1 text-center">
+                        {menuForm.imagePreview ? (
+                          <div className="relative">
+                            <img
+                              src={menuForm.imagePreview}
+                              alt="Preview"
+                              className="mx-auto h-48 w-48 object-cover rounded-lg"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setMenuForm({...menuForm, image: null, imagePreview: ""})}
+                              className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full"
+                            >
+                              <FontAwesomeIcon icon={faTimes} className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <FontAwesomeIcon 
+                              icon={faUtensils} 
+                              className="mx-auto h-12 w-12 text-gray-400"
+                            />
+                            <div className="flex text-sm text-gray-600">
+                              <label className="relative cursor-pointer bg-white rounded-md font-medium text-own-2 hover:text-amber-600">
+                                <span>Upload an image</span>
+                                <input
+                                  type="file"
+                                  className="sr-only"
+                                  accept="image/*"
+                                  onChange={(e) => {
+                                    const file = e.target.files[0];
+                                    if (file) {
+                                      setMenuForm({
+                                        ...menuForm,
+                                        image: file,
+                                        imagePreview: URL.createObjectURL(file)
+                                      });
+                                    }
+                                  }}
+                                />
+                              </label>
+                              <p className="pl-1">or drag and drop</p>
+                            </div>
+                            <p className="text-xs text-gray-500">
+                              PNG, JPG, GIF up to 10MB
+                            </p>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
-                    <input
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+                      <input
                         type="text"
                         required
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
+                        className="w-full px-4 py-3 border text-black border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
                         value={menuForm.name}
                         onChange={(e) => setMenuForm({...menuForm, name: e.target.value})}
-                    />
+                        placeholder="e.g., Jollof Rice"
+                      />
                     </div>
 
                     <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Price (₦)</label>
-                    <input
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Price (₦) *</label>
+                      <input
                         type="number"
                         required
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
+                        min="0"
+                        step="0.01"
+                        className="w-full px-4 py-3 border text-black border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
                         value={menuForm.price}
                         onChange={(e) => setMenuForm({...menuForm, price: e.target.value})}
-                    />
+                        placeholder="3000"
+                      />
                     </div>
-                </div>
+                  </div>
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Description *</label>
                     <textarea
-                    required
-                    rows={3}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
-                    value={menuForm.description}
-                    onChange={(e) => setMenuForm({...menuForm, description: e.target.value})}
+                      required
+                      rows={3}
+                      className="w-full px-4 py-3 border text-black border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
+                      value={menuForm.description}
+                      onChange={(e) => setMenuForm({...menuForm, description: e.target.value})}
+                      placeholder="Describe the dish..."
                     />
-                </div>
+                  </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-                    <select
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Category *</label>
+                      <select
                         required
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
+                        className="w-full px-4 py-3 border text-black border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
                         value={menuForm.category}
                         onChange={(e) => setMenuForm({...menuForm, category: e.target.value})}
-                    >
+                      >
                         <option value="">Select Category</option>
                         {categories.map(cat => (
-                        <option key={cat.id} value={cat.name}>{cat.name}</option>
+                          <option key={cat.id} value={cat.name}>{cat.name}</option>
                         ))}
-                    </select>
+                      </select>
                     </div>
 
                     <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Preparation Time (minutes)</label>
-                    <input
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Preparation Time (minutes)</label>
+                      <input
                         type="number"
-                        required
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
+                        min="0"
+                        className="w-full px-4 py-3 border text-black border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
                         value={menuForm.preparationTime}
                         onChange={(e) => setMenuForm({...menuForm, preparationTime: e.target.value})}
-                    />
+                      />
                     </div>
-                </div>
+                  </div>
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Ingredients (comma separated)</label>
-                    <input
-                    type="text"
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
-                    value={menuForm.ingredients}
-                    onChange={(e) => setMenuForm({...menuForm, ingredients: e.target.value})}
-                    placeholder="Rice, Tomatoes, Bell peppers, Onions..."
-                    />
-                </div>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Calories</label>
+                      <input
+                        type="number"
+                        min="0"
+                        className="w-full px-4 py-3 border text-black border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
+                        value={menuForm.calories}
+                        onChange={(e) => setMenuForm({...menuForm, calories: e.target.value})}
+                        placeholder="Optional"
+                      />
+                    </div>
+                    
+                    <div className="flex items-end">
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 text-own-2 focus:ring-own-2"
+                          checked={menuForm.available}
+                          onChange={(e) => setMenuForm({...menuForm, available: e.target.checked})}
+                        />
+                        <span className="ml-2 text-sm text-gray-700">Available for order</span>
+                      </label>
+                    </div>
+                  </div>
 
-                <div className="flex items-center gap-2">
-                    <input
-                    type="checkbox"
-                    id="featured"
-                    className="h-4 w-4 text-own-2 focus:ring-own-2"
-                    />
-                    <label htmlFor="featured" className="text-sm text-gray-700">
-                    Feature this item on homepage
-                    </label>
-                </div>
+                  {/* Ingredients */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Ingredients</label>
+                    <div className="space-y-2">
+                      {menuForm.ingredients.map((ingredient, index) => (
+                        <div key={index} className="flex gap-2">
+                          <input
+                            type="text"
+                            value={ingredient}
+                            onChange={(e) => updateIngredient(index, e.target.value)}
+                            className="flex-1 px-4 py-2 border text-black border-gray-300 rounded-lg focus:ring-2 focus:ring-own-2 focus:border-own-2"
+                            placeholder="Add ingredient"
+                          />
+                          {menuForm.ingredients.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeIngredient(index)}
+                              className="px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+                            >
+                              <FontAwesomeIcon icon={faTimes} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={addIngredient}
+                        className="text-own-2 hover:text-amber-600 text-sm font-medium flex items-center"
+                      >
+                        <FontAwesomeIcon icon={faPlus} className="mr-1 h-4 w-4" />
+                        Add Ingredient
+                      </button>
+                    </div>
+                  </div>
 
-                <div className="flex gap-4 pt-4">
+                  {/* Dietary Options */}
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-4">
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={menuForm.isVegetarian}
+                          onChange={(e) => setMenuForm({...menuForm, isVegetarian: e.target.checked})}
+                          className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                        />
+                        <span className="ml-2 text-sm text-gray-700 flex items-center">
+                          <FontAwesomeIcon icon={faLeaf} className="h-4 w-4 mr-1 text-green-500" />
+                          Vegetarian
+                        </span>
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={menuForm.isSpicy}
+                          onChange={(e) => setMenuForm({...menuForm, isSpicy: e.target.checked})}
+                          className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                        />
+                        <span className="ml-2 text-sm text-gray-700 flex items-center">
+                          <FontAwesomeIcon icon={faFire} className="h-4 w-4 mr-1 text-red-500" />
+                          Spicy
+                        </span>
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={menuForm.isFeatured}
+                          onChange={(e) => setMenuForm({...menuForm, isFeatured: e.target.checked})}
+                          className="h-4 w-4 text-yellow-600 focus:ring-yellow-500 border-gray-300 rounded"
+                        />
+                        <span className="ml-2 text-sm text-gray-700 flex items-center">
+                          <FontAwesomeIcon icon={faStar} className="h-4 w-4 mr-1 text-yellow-500" />
+                          Featured
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4 pt-4">
                     <button
-                    type="submit"
-                    className="flex-1 bg-own-2 text-white py-3 rounded-xl hover:bg-amber-600 transition-colors"
+                      type="submit"
+                      disabled={saving}
+                      className="flex-1 bg-own-2 text-white py-3 rounded-xl hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                     >
-                    {editingItem ? 'Update Menu Item' : 'Add Menu Item'}
+                      {saving ? (
+                        <>
+                          <FontAwesomeIcon icon={faSpinner} className="animate-spin mr-2" />
+                          {editingItem ? 'Updating...' : 'Saving...'}
+                        </>
+                      ) : (
+                        editingItem ? 'Update Menu Item' : 'Add Menu Item'
+                      )}
                     </button>
                     <button
-                    type="button"
-                    onClick={() => setShowMenuModal(false)}
-                    className="flex-1 border border-gray-300 text-gray-700 py-3 rounded-xl hover:bg-gray-50 transition-colors"
+                      type="button"
+                      onClick={() => {
+                        setShowMenuModal(false);
+                        resetMenuForm();
+                      }}
+                      disabled={saving}
+                      className="flex-1 border border-gray-300 text-gray-700 py-3 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50"
                     >
-                    Cancel
+                      Cancel
                     </button>
-                </div>
+                  </div>
                 </form>
+              </div>
             </div>
-            </div>
-        )}
+          )}
         </div>
       </div>
     </>

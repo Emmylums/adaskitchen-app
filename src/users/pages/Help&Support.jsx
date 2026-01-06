@@ -8,25 +8,18 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import UserNavBar from "../components/UserNavbar";
 import UserSideBar from "../components/UserSidebar";
+import { useUserData } from "../hooks/useUserData";
 
 export default function Support() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const closeSidebar = () => setIsSidebarOpen(false);
   const toggleSidebars = () => {
     setIsSidebarOpen(prev => !prev);
   };
   const [activeTab, setActiveTab] = useState("Support");
+    const { userData, loading: userLoading } = useUserData();
 
-  // Mock user data
-  const userData = {
-    name: "Ada Johnson",
-    email: "ada.johnson@email.com",
-    phone: "+234 912 345 6789",
-    joinDate: "January 2024",
-    lastLogin: "2024-01-15 14:30",
-    loginLocation: "Lagos, Nigeria",
-    walletBalance: 12500
-  };
+
   return (
     <>
       <UserNavBar toggleSidebar={toggleSidebars} isSideBarOpen={isSidebarOpen}/>

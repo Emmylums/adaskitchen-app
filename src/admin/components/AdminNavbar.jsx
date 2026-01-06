@@ -61,9 +61,11 @@ const AdminNavBar = ({toggleSidebar, isSideBarOpen}) => {
                         />
                         <FontAwesomeIcon icon={faSearch} className="absolute left-3 top-3 text-own-2" />
                       </div>
-                      <button className="p-2 rounded-lg hover:bg-amber-060">
-                        <FontAwesomeIcon icon={faCog} className="text-own-2" />
-                      </button>
+                      <Link to="/admin/settings">
+                        <button className="p-2 rounded-lg hover:bg-amber-060">
+                          <FontAwesomeIcon icon={faCog} className="text-own-2" />
+                        </button>
+                      </Link>
                     </div>
                 </header>
               </div>

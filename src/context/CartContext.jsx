@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { useUserData } from "../users/hooks/useUserData";
 
 // Create context
 const CartContext = createContext();
@@ -8,23 +9,44 @@ export const useCart = () => useContext(CartContext);
 
 // Provider component
 export const CartProvider = ({ children }) => {
-  const [cart, setCart] = useState([]);
+  const { userData, loading: userLoading } = useUserData();
+  // Load cart from localStorage on initial render
+  const [cart, setCart] = useState(() => {
+    try {
+      const savedCart = localStorage.getItem('cart');
+      if (savedCart) {
+        const parsedCart = JSON.parse(savedCart);
+        return Array.isArray(parsedCart) ? parsedCart : [];
+      }
+    } catch (error) {
+      console.error("Error loading cart from localStorage:", error);
+    }
+    return [];
+  });
+
+  
 
   const addToCart = (item, quantityToAdd = 1) => {
-  setCart(prevCart => {
-    const exists = prevCart.find(cartItem => cartItem.id === item.id);
-    if (exists) {
-      const newQty = Math.min(exists.quantity + quantityToAdd, exists.stock || Infinity);
-      return prevCart.map(cartItem =>
-        cartItem.id === item.id
-          ? { ...cartItem, quantity: newQty }
-          : cartItem
-      );
-    }
-    return [...prevCart, { ...item, quantity: quantityToAdd }];
-  });
-};
-
+    setCart(prevCart => {
+      const exists = prevCart.find(cartItem => cartItem.id === item.id);
+      if (exists) {
+        const newQty = Math.min(exists.quantity + quantityToAdd, exists.stock || Infinity);
+        const updatedCart = prevCart.map(cartItem =>
+          cartItem.id === item.id
+            ? { ...cartItem, quantity: newQty }
+            : cartItem
+        );
+        return updatedCart;
+      }
+      // Add stock property from the item if it exists
+      const newItem = { 
+        ...item, 
+        quantity: quantityToAdd,
+        stock: item.stock || 100 // Default stock if not provided
+      };
+      return [...prevCart, newItem];
+    });
+  };
 
   const removeFromCart = (id) => {
     setCart(prevCart => prevCart.filter(cartItem => cartItem.id !== id));
@@ -32,7 +54,6 @@ export const CartProvider = ({ children }) => {
 
   const updateQuantity = (id, newQuantity) => {
     if (newQuantity < 1) {
-      // Remove item if quantity is less than 1 (used for Delete too)
       removeFromCart(id);
       return;
     }
@@ -48,7 +69,6 @@ export const CartProvider = ({ children }) => {
       )
     );
   };
-
 
   const clearCart = () => {
     setCart([]);
@@ -66,10 +86,22 @@ export const CartProvider = ({ children }) => {
     return cart.reduce((total, item) => total + item.price * item.quantity, 0);
   };
 
+  // Helper function to check if item exists in cart
+  const isInCart = (id) => {
+    return cart.some(item => item.id === id);
+  };
+
+  // Get item quantity in cart
+  const getItemQuantity = (id) => {
+    const item = cart.find(item => item.id === id);
+    return item ? item.quantity : 0;
+  };
+
   return (
     <CartContext.Provider
       value={{
         cart,
+        userData,
         addToCart,
         removeFromCart,
         updateQuantity,
@@ -77,6 +109,8 @@ export const CartProvider = ({ children }) => {
         getTotalItems,
         getTotalQuantity,
         getCartTotal,
+        isInCart,
+        getItemQuantity
       }}
     >
       {children}

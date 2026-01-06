@@ -37,7 +37,7 @@ const ScrollToTopButton = () => {
   return (
     <Link to="top" smooth={true} duration={500}>
     <button
-      className={`fixed bottom-5 right-5 px-3 py-2 bg-own-2 text-black rounded-lg shadow-lg transition-all ease-in-out duration-150 ${
+      className={`fixed bottom-5 right-5 px-3 py-2 bg-own-2 text-white rounded-lg shadow-lg transition-all ease-in-out duration-150 ${
         isVisible ? `opacity-100 z-50 cursor-pointer ${show ? "" : "hidden"}` : "opacity-0"
       }`}
     >

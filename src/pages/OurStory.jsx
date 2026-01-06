@@ -1,44 +1,108 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import NavBar from "../components/NavBar";
 import MobileNavBar from "../components/MobileNavBar";
 import cooking from "../assets/cooking.png";
-import { useState } from "react";
 import { motion } from 'framer-motion';
 import { Link } from "react-router-dom";
 import Footer from "../components/Footer";
+import { db } from "../firebaseConfig";
+import { collection, getDocs, query } from "firebase/firestore";
 
 export default function OurStory() {
     const [mobileNavBarVisible, setMobileNavBarVisible] = useState(false);
     const [activeFAQ, setActiveFAQ] = useState(null);
+    const [chef, setChef] = useState(null);
+    const [galleryImages, setGalleryImages] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    // Team data
-    const teamMembers = [
-        {
-            name: "Ada Johnson",
-            role: "Founder & Head Chef",
-            bio: "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist.",
-        },
-        {
-            name: "Michael Chen",
-            role: "Executive Chef",
-            bio: "Specializing in West African cuisine, Michael ensures every dish maintains authentic flavors while meeting high standards.",
-        },
-        {
-            name: "Sarah Williams",
-            role: "Operations Manager",
-            bio: "Sarah ensures smooth operations and that every customer experience exceeds expectations.",
+    // Fetch chef data and gallery images from Firebase
+    const fetchData = async () => {
+        setLoading(true);
+        setError(null);
+        
+        try {
+            // Fetch chef data
+            const chefRef = collection(db, "chefInformation");
+            const chefQuery = query(chefRef);
+            const chefSnapshot = await getDocs(chefQuery);
+            
+            let chefData = null;
+            if (!chefSnapshot.empty) {
+                const chefDoc = chefSnapshot.docs[0];
+                chefData = {
+                    id: chefDoc.id,
+                    name: chefDoc.data().name || "Ada Johnson",
+                    bio: chefDoc.data().chefBio || "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist.",
+                    image: chefDoc.data().chefImage || null
+                };
+            } else {
+                // Default chef data if no chef in database
+                chefData = {
+                    name: "Ada Johnson",
+                    bio: "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist.",
+                    image: null
+                };
+            }
+            setChef(chefData);
+            
+            // Fetch gallery images
+            const galleryRef = collection(db, "gallery");
+            const galleryQuery = query(galleryRef);
+            const gallerySnapshot = await getDocs(galleryQuery);
+            
+            const galleryData = [];
+            gallerySnapshot.forEach((doc) => {
+                const data = doc.data();
+                galleryData.push({
+                    id: doc.id,
+                    alt: data.alt || "Gallery image",
+                    image: data.image || data.imageUrl || data.url || null,
+                    title: data.title || data.name || ""
+                });
+            });
+            
+            // If no gallery images in database, use default placeholders
+            if (galleryData.length === 0) {
+                setGalleryImages([
+                    { id: 1, alt: "Traditional Nigerian Jollof Rice" },
+                    { id: 2, alt: "Chef preparing Suya" },
+                    { id: 3, alt: "Colorful African spices" },
+                    { id: 4, alt: "Customers enjoying meal" },
+                    { id: 5, alt: "Catering event setup" },
+                    { id: 6, alt: "Fresh ingredients preparation" }
+                ]);
+            } else {
+                setGalleryImages(galleryData);
+            }
+            
+        } catch (err) {
+            console.error("Error fetching data:", err);
+            setError("Failed to load content. Please try again later.");
+            
+            // Set default data if Firebase fails
+            setChef({
+                name: "Ada Johnson",
+                bio: "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist.",
+                image: null
+            });
+            
+            setGalleryImages([
+                { id: 1, alt: "Traditional Nigerian Jollof Rice" },
+                { id: 2, alt: "Chef preparing Suya" },
+                { id: 3, alt: "Colorful African spices" },
+                { id: 4, alt: "Customers enjoying meal" },
+                { id: 5, alt: "Catering event setup" },
+                { id: 6, alt: "Fresh ingredients preparation" }
+            ]);
+        } finally {
+            setLoading(false);
         }
-    ];
+    };
 
-    // Gallery images
-    const galleryImages = [
-        { alt: "Traditional Nigerian Jollof Rice" },
-        { alt: "Chef preparing Suya" },
-        { alt: "Colorful African spices" },
-        { alt: "Customers enjoying meal" },
-        { alt: "Catering event setup" },
-        { alt: "Fresh ingredients preparation" }
-    ];
+    useEffect(() => {
+        fetchData();
+    }, []);
 
     // Mission & Values
     const missionValues = [
@@ -94,7 +158,6 @@ export default function OurStory() {
             if (window.location.hash === '#faq') {
                 const faqSection = document.getElementById('faq');
                 if (faqSection) {
-                    // Small delay to ensure the page is fully rendered
                     setTimeout(() => {
                         faqSection.scrollIntoView({ behavior: 'smooth' });
                     }, 100);
@@ -102,16 +165,52 @@ export default function OurStory() {
             }
         };
 
-        // Check on initial load
         handleHashChange();
-
-        // Listen for hash changes
         window.addEventListener('hashchange', handleHashChange);
 
         return () => {
             window.removeEventListener('hashchange', handleHashChange);
         };
     }, []);
+
+    // Loading state
+    if (loading) {
+        return (
+            <>
+                <NavBar activeLink="Our Story" onToggleMobileNavBar={() => setMobileNavBarVisible(!mobileNavBarVisible)} />
+                <MobileNavBar isVisible={mobileNavBarVisible} activeLink="Our Story" onClose={() => setMobileNavBarVisible(false)} className="md:col-span-1 pt-7"/>
+                <div className="flex justify-center items-center h-screen bg-own-1">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-own-2 mx-auto"></div>
+                        <p className="mt-4 text-gray-600">Loading ...</p>
+                    </div>
+                </div>
+                <Footer/>
+            </>
+        );
+    }
+
+    // Error state
+    if (error) {
+        return (
+            <>
+                <NavBar activeLink="Our Story" onToggleMobileNavBar={() => setMobileNavBarVisible(!mobileNavBarVisible)} />
+                <MobileNavBar isVisible={mobileNavBarVisible} activeLink="Our Story" onClose={() => setMobileNavBarVisible(false)} className="md:col-span-1 pt-7"/>
+                <div className="flex justify-center items-center h-screen">
+                    <div className="text-center p-6 bg-red-50 rounded-lg">
+                        <p className="text-red-600 mb-4">{error}</p>
+                        <button 
+                            onClick={() => window.location.reload()}
+                            className="bg-own-2 text-black px-4 py-2 rounded-md"
+                        >
+                            Try Again
+                        </button>
+                    </div>
+                </div>
+                <Footer/>
+            </>
+        );
+    }
 
     return (
         <>
@@ -155,32 +254,6 @@ export default function OurStory() {
                 </div>
             </div>
 
-            {/* Values Section */}
-            {/* <div className="bg-own-2 py-20 text-black">
-                <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-10 px-6">
-                    <motion.div initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} viewport={{ once: true, amount: 0.15 }} className="bg-white bg-opacity-10 backdrop-blur-sm p-7 rounded-3xl shadow-lg transition-transform hover:scale-105">
-                        <h3 className="text-2xl font-bold mb-4">Fresh Ingredients</h3>
-                        <p className="text-md">
-                            We hand-pick the freshest produce and finest spices to ensure every meal bursts with authentic flavors.
-                        </p>
-                    </motion.div>
-
-                    <motion.div initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} viewport={{ once: true, amount: 0.15 }} className="bg-white bg-opacity-10 backdrop-blur-sm p-7 rounded-3xl shadow-lg transition-transform hover:scale-105">
-                        <h3 className="text-2xl font-bold mb-4">Family Recipes</h3>
-                        <p className="text-md">
-                            Our menu is inspired by timeless family recipes that honor our African heritage and culinary traditions.
-                        </p>
-                    </motion.div>
-
-                    <motion.div initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} viewport={{ once: true, amount: 0.15 }} className="bg-white bg-opacity-10 backdrop-blur-sm p-7 rounded-3xl shadow-lg transition-transform hover:scale-105">
-                        <h3 className="text-2xl font-bold mb-4">Passion for Service</h3>
-                        <p className="text-md">
-                            Every guest is family. We are committed to delivering warm hospitality and exceptional dining experiences.
-                        </p>
-                    </motion.div>
-                </div>
-            </div> */}
-
             {/* Mission & Values Statement Section */}
             <section className="py-20 bg-own-2">
                 <div className="max-w-6xl mx-auto px-6">
@@ -206,25 +279,35 @@ export default function OurStory() {
             {/* Meet the Team Section */}
             <section className="py-20 bg-gray-50">
                 <div className="max-w-6xl mx-auto px-6">
-                    <h2 className="text-4xl font-bold text-center text-own-2 mb-16 font-display2">Meet Our Team</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        {teamMembers.map((member, index) => (
-                            <motion.div
-                                key={index}
-                                initial={{ opacity: 0, y: 50 }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.6, delay: index * 0.2 }}
-                                viewport={{ once: true }}
-                                className="text-center bg-white p-6 rounded-2xl shadow-md"
-                            >
+                    <h2 className="text-4xl font-bold text-center text-own-2 mb-16 font-display2">About The Chef</h2>
+                    <div className="flex justify-center">
+                        <motion.div
+                            initial={{ opacity: 0, y: 50 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.6 }}
+                            viewport={{ once: true }}
+                            className="text-center bg-white p-8 rounded-2xl shadow-md max-w-md"
+                        >
+                            {chef?.image ? (
+                                <div className="w-48 h-48 mx-auto mb-6 rounded-full overflow-hidden border-4 border-own-2">
+                                    <img 
+                                        src={chef.image} 
+                                        alt={chef.name}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                            e.target.style.display = 'none';
+                                            e.target.parentElement.innerHTML = '<span class="text-4xl text-white bg-own-2 w-full h-full flex items-center justify-center">👨‍🍳</span>';
+                                        }}
+                                    />
+                                </div>
+                            ) : (
                                 <div className="w-48 h-48 mx-auto mb-6 bg-gradient-to-br from-own-2 to-amber-400 rounded-full flex items-center justify-center">
                                     <span className="text-4xl text-white">👨‍🍳</span>
                                 </div>
-                                <h3 className="text-2xl font-bold text-own-2 mb-2">{member.name}</h3>
-                                <p className="text-gray-600 mb-4">{member.role}</p>
-                                <p className="text-gray-700">{member.bio}</p>
-                            </motion.div>
-                        ))}
+                            )}
+                            <h3 className="text-2xl font-bold text-own-2 mb-2">{chef?.name || "Ada Johnson"}</h3>
+                            <p className="text-gray-700">{chef?.bio || "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist."}</p>
+                        </motion.div>
                     </div>
                 </div>
             </section>
@@ -236,14 +319,29 @@ export default function OurStory() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                         {galleryImages.map((image, index) => (
                             <motion.div
-                                key={index}
+                                key={image.id || index}
                                 initial={{ opacity: 0, scale: 0.9 }}
                                 whileInView={{ opacity: 1, scale: 1 }}
                                 transition={{ duration: 0.6, delay: index * 0.1 }}
                                 viewport={{ once: true }}
                                 className="aspect-square bg-white rounded-2xl overflow-hidden shadow-lg flex items-center justify-center"
                             >
-                                <span className="text-3xl text-white">📸</span>
+                                {image.image ? (
+                                    <img 
+                                        src={image.image} 
+                                        alt={image.alt || image.title || "Gallery image"}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                            e.target.style.display = 'none';
+                                            e.target.parentElement.innerHTML = `<span class="text-3xl text-gray-400">📸</span><p class="text-sm text-gray-600 mt-2 text-center px-2">${image.alt || image.title || "Gallery image"}</p>`;
+                                        }}
+                                    />
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center p-4">
+                                        <span className="text-3xl text-gray-400 mb-2">📸</span>
+                                        <p className="text-sm text-gray-600 text-center">{image.alt || image.title || "Gallery image"}</p>
+                                    </div>
+                                )}
                             </motion.div>
                         ))}
                     </div>
@@ -262,13 +360,13 @@ export default function OurStory() {
                                 whileInView={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.4, delay: index * 0.1 }}
                                 viewport={{ once: true }}
-                                className="border-b border-gray-200 pb-4 w-full" // Added w-full here
+                                className="border-b border-gray-200 pb-4 w-full"
                             >
                                 <button
                                     onClick={() => toggleFAQ(index)}
                                     className="flex items-center justify-between w-full text-left py-4 font-semibold text-lg text-own-2 hover:text-amber-600 transition-colors"
                                 >
-                                    <span className="pr-4">{faq.question}</span> {/* Added padding to prevent text touching plus/minus */}
+                                    <span className="pr-4">{faq.question}</span>
                                     <span className="text-lg flex-shrink-0">
                                         {activeFAQ === index ? '−' : '+'}
                                     </span>
@@ -283,9 +381,9 @@ export default function OurStory() {
                                         duration: 0.3,
                                         ease: "easeInOut"
                                     }}
-                                    className="overflow-hidden w-full" // Added w-full here
+                                    className="overflow-hidden w-full"
                                 >
-                                    <p className="text-gray-700 pb-4 w-full">{faq.answer}</p> {/* Added w-full here */}
+                                    <p className="text-gray-700 pb-4 w-full">{faq.answer}</p>
                                 </motion.div>
                             </motion.div>
                         ))}

@@ -3,25 +3,16 @@ import { motion } from 'framer-motion';
 import { Link } from "react-router-dom";
 import UserNavBar from "../components/UserNavbar";
 import UserSideBar from "../components/UserSidebar";
+import { useUserData } from "../hooks/useUserData";
 
 export default function Security() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const closeSidebar = () => setIsSidebarOpen(false);
   const toggleSidebars = () => {
     setIsSidebarOpen(prev => !prev);
   };
   const [activeTab, setActiveTab] = useState("Security");
-
-  // Mock user data
-  const userData = {
-    name: "Ada Johnson",
-    email: "ada.johnson@email.com",
-    phone: "+234 912 345 6789",
-    joinDate: "January 2024",
-    lastLogin: "2024-01-15 14:30",
-    loginLocation: "Lagos, Nigeria",
-    walletBalance: 12500
-  };
+    const { userData, loading: userLoading } = useUserData();
 
   const securitySettings = {
     twoFactor: false,

@@ -12,13 +12,6 @@ import Catering from "./pages/Catering";
 import ContactUs from "./pages/ContactUs";
 import Cart from "./pages/Cart";
 import Menu from "./pages/Menu";
-import Checkout from "./pages/Checkout";
-import AdminHome from "./admin/pages/AdminHome";
-import EditMenu from "./admin/pages/EditMenu";
-import AllMenu from "./admin/pages/AllMenu";
-import EditCategory from "./admin/pages/EditCategory";
-import AllInvoices from "./admin/pages/AllInvoices";
-import AllOrders from "./admin/pages/AllOrders";
 import Settings from "./admin/pages/Settings";
 import OrderHistory from "./users/pages/OrderHistory";
 import Payments from "./users/pages/Payments";
@@ -40,6 +33,11 @@ import Gallery from "./admin/pages/Gallery";
 import ACatering from "./admin/pages/Catering";
 import Orders from "./admin/pages/Orders";
 import Invoices from "./admin/pages/Invoices";
+import ManagerDashboard from "./admin/pages/ManagerDashboard";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import CompleteProfile from "./pages/CompleteProfile";
+import Checkout from "./users/pages/Checkout";
 
 
 function ScrollToTop() {
@@ -69,23 +67,13 @@ function App() {
         <Route exact path="/Terms&Conditions" element={<TermsAndConditions/>}/>
         <Route exact path="/Privacy Policy" element={<PrivacyPolicy/>}/>
         <Route exact path="/Cart" element={<Cart/>}/>
-        <Route exact path="/checkout" element={<Checkout/>}/>
         <Route exact path="/Contact Us" element={<ContactUs/>}/>
         <Route exact path="/Login" element={<Login/>}/>
         <Route exact path="/Signup" element={<Signup/>}/>
-        <Route path="/admin/menu/add" element={<EditMenu />} />
-        <Route path="/admin/menu/edit/:id" element={<EditMenu />} />
-        <Route path="/admin/menu/all" element={<AllMenu />} />
-        <Route path="/admin/categories/add" element={<EditCategory />} />
-        <Route path="/admin/categories/edit/:id" element={<EditCategory />} />
-        <Route path="/admin/categories/all" element={<AllMenu />} />
-        <Route path="/admin/invoices/add" element={<EditCategory />} />
-        <Route path="/admin/invoices/edit/:id" element={<EditCategory />} />
-        <Route path="/admin/invoices/all" element={<AllInvoices />} />
-        <Route path="/admin/orders/add" element={<EditCategory />} />
-        <Route path="/admin/orders/edit/:id" element={<EditCategory />} />
-        <Route path="/admin/orders/all" element={<AllOrders />} />
-        <Route path="/admin/settings" element={<Settings />} />
+        <Route exact path="/complete-profile" element={<CompleteProfile/>}/>
+        <Route exact path="/Forgot-password" element={<ForgotPassword/>}/>
+        <Route exact path="/Reset-password" element={<ResetPassword/>}/>
+        
 
 
 
@@ -96,23 +84,25 @@ function App() {
         <Route path="/user/Payments" element={<Payments />} />
         <Route path="/user/Menu" element={<UMenu />} />
         <Route path="/user/Cart" element={<UCart />} />
+        <Route path="/user/Checkout" element={<Checkout />} />
         <Route path="/user/Notifications" element={<Notifications />} />
         <Route path="/user/Favorites" element={<Favorites />} />
         <Route path="/user/Addresses" element={<Addresses />} />
-        <Route path="/user/Security" element={<Security />} />
+        {/* <Route path="/user/Security" element={<Security />} /> */}
         <Route path="/user/Support" element={<Support />} />
         <Route path="/user/Settings" element={<USettings />} />
  
 
 
       {/* Admin Pages */}
-        <Route path="/admin/Dashboard" element={<AdminHome />} />
+        <Route path="/admin/Dashboard" element={<ManagerDashboard />} />
         <Route path="/admin/Menu" element={<MenuManagement />} />
         <Route path="/admin/Categories" element={<Categories />} />
         <Route path="/admin/Gallery" element={<Gallery />} />
         <Route path="/admin/Catering" element={<ACatering />} />
         <Route path="/admin/Orders" element={<Orders />} />
         <Route path="/admin/Invoices" element={<Invoices />} />
+        <Route path="/admin/settings" element={<Settings />} />
         
         <Route path="/admin/test" element={<AdminDashboard />} />
         <Route path="/admin/testing" element={<Testing />} />
