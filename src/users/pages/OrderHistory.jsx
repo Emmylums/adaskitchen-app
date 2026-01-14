@@ -20,6 +20,7 @@ import UserNavBar from "../components/UserNavbar";
 import UserSideBar from "../components/UserSidebar";
 import { useUserData } from "../hooks/useUserData";
 import { useAuth } from "../../context/AuthContext";
+import { useCart } from "../../context/CartContext"; // Import CartContext
 import { db } from "../../firebaseConfig";
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
 import { faPaypal } from "@fortawesome/free-brands-svg-icons";
@@ -39,6 +40,7 @@ export default function OrderHistory() {
   
   const { user } = useAuth();
   const { userData, loading: userLoading } = useUserData();
+  const { addToCart, clearCart, getTotalQuantity } = useCart(); // Use CartContext
 
   // Fetch user's order history from Firestore orders collection
   useEffect(() => {
@@ -260,17 +262,79 @@ export default function OrderHistory() {
     }).format(pounds);
   };
 
-  // Function to reorder an item
+  // Function to reorder an individual item
   const reorderItem = (item) => {
-    alert(`Adding ${item.name} to your cart!`);
-    // In a real app, this would add the item to the cart
-    // You might want to use your cart context here
+    try {
+      const confirmAdd = window.confirm(
+        `Add "${item.name}" to your cart?`
+      );
+      
+      if (!confirmAdd) return;
+      
+      const cartItem = {
+        id: item.id || item.productId || Math.random().toString(36).substr(2, 9),
+        name: item.name,
+        price: item.price/100 || 0,
+        quantity: item.quantity || 1,
+        specialInstructions: item.specialInstructions || '',
+        stock: item.stock || 100
+      };
+      
+      addToCart(cartItem);
+      
+      alert(`✅ "${item.name}" added to cart!`);
+    } catch (error) {
+      console.error("Error reordering item:", error);
+      alert("❌ Failed to add item to cart. Please try again.");
+    }
   };
 
-  // Function to handle "Order Again"
-  const handleOrderAgain = (order) => {
-    alert(`Reordering order #${order.orderNumber}!`);
-    // In a real app, this would add all items from the order to cart
+  // Function to handle "Order Again" for entire order
+  const handleOrderAgain = async (order) => {
+    try {
+      // First, confirm with the user
+      const confirmReorder = window.confirm(
+        `Add all items from order #${order.orderNumber || `ORD-${order.id.substring(0, 8).toUpperCase()}`} to your cart?`
+      );
+      
+      if (!confirmReorder) return;
+      
+      // Ask if user wants to clear existing cart
+      const clearExisting = window.confirm(
+        "Would you like to clear your current cart items before adding these?"
+      );
+      
+      if (clearExisting) {
+        clearCart();
+      }
+      
+      // Add all items from the order to cart
+      let addedCount = 0;
+      if (order.items && order.items.length > 0) {
+        order.items.forEach(item => {
+          const cartItem = {
+            id: item.id || item.productId || Math.random().toString(36).substr(2, 9),
+            name: item.name,
+            price: item.price/100 || 0,
+            quantity: item.quantity || 1,
+            specialInstructions: item.specialInstructions || '',
+            image: item.image || '',
+            category: item.category || '',
+            stock: item.stock || 100
+          };
+          
+          addToCart(cartItem);
+          addedCount++;
+        });
+      }
+      
+      // Show success message
+      alert(`✅ Added ${addedCount} item${addedCount !== 1 ? 's' : ''} to your cart!`);
+      
+    } catch (error) {
+      console.error("Error reordering order:", error);
+      alert("❌ Failed to add items to cart. Please try again.");
+    }
   };
 
   return (
@@ -421,9 +485,9 @@ export default function OrderHistory() {
                                             </span>
                                             <button 
                                               onClick={() => reorderItem(item)}
-                                              className="text-own-2 hover:text-amber-600 text-sm"
+                                              className="text-own-2 hover:text-amber-600 text-sm flex items-center gap-1"
                                             >
-                                              <FontAwesomeIcon icon={faRedo} className="mr-1" />
+                                              <FontAwesomeIcon icon={faRedo} />
                                               Reorder
                                             </button>
                                           </div>
@@ -456,7 +520,13 @@ export default function OrderHistory() {
                                     {order.deliveryAddress && (
                                       <div className="flex justify-between">
                                         <span className="text-gray-600">Address:</span>
-                                        <span className="text-right max-w-xs">{order.deliveryAddress}</span>
+                                        <span className="text-right max-w-xs">
+                                          {typeof order.deliveryAddress === 'string' 
+                                            ? order.deliveryAddress 
+                                            : order.deliveryAddress.fullAddress || 
+                                              order.deliveryAddress.address || 
+                                              `${order.deliveryAddress.line1 || ''} ${order.deliveryAddress.city || ''}`.trim()}
+                                        </span>
                                       </div>
                                     )}
                                     
@@ -509,13 +579,23 @@ export default function OrderHistory() {
                                     </div>
                                   </div>
                                   
+                                  {/* Show Order Again button for delivered/completed orders */}
                                   {(order.orderStatus === "delivered" || order.orderStatus === "completed") && (
-                                    <button 
-                                      onClick={() => handleOrderAgain(order)}
-                                      className="mt-4 px-4 py-2 bg-own-2 text-white rounded-xl hover:bg-amber-600 transition-colors"
-                                    >
-                                      Order Again
-                                    </button>
+                                    <div className="mt-4 flex gap-3">
+                                      <button 
+                                        onClick={() => handleOrderAgain(order)}
+                                        className="px-4 py-2 bg-own-2 text-white rounded-xl hover:bg-amber-600 transition-colors flex items-center gap-2"
+                                      >
+                                        <FontAwesomeIcon icon={faRedo} />
+                                        Order Again
+                                      </button>
+                                      <Link
+                                        to="/user/cart"
+                                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
+                                      >
+                                        View Cart
+                                      </Link>
+                                    </div>
                                   )}
                                 </div>
                               </div>

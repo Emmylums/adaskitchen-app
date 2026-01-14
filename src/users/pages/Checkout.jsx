@@ -50,8 +50,6 @@ export default function Checkout() {
   const [useNewCard, setUseNewCard] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [debugLogs, setDebugLogs] = useState([]);
-  const [showDebug, setShowDebug] = useState(false);
   
   // Form states
   const [formData, setFormData] = useState({
@@ -71,15 +69,6 @@ export default function Checkout() {
   const stripe = useStripe();
   const elements = useElements();
 
-  const addDebugLog = (message, data = null) => {
-    console.log(`[DEBUG] ${message}`, data);
-    setDebugLogs(prev => [...prev, {
-      timestamp: new Date().toISOString(),
-      message,
-      data: data ? JSON.stringify(data, null, 2) : null
-    }]);
-  };
-
   const closeSidebar = () => setIsSidebarOpen(false);
   const toggleSidebars = () => {
     setIsSidebarOpen(prev => !prev);
@@ -90,7 +79,6 @@ export default function Checkout() {
     if (userData?.addresses && userData.addresses.length > 0) {
       const defaultAddr = userData.addresses.find(addr => addr.isDefault) || userData.addresses[0];
       setSelectedAddress(defaultAddr);
-      addDebugLog("Default address set", defaultAddr);
     }
   }, [userData]);
 
@@ -100,20 +88,16 @@ export default function Checkout() {
 
     const fetchCards = async () => {
       try {
-        addDebugLog("Fetching saved cards for user", { uid: userData.uid });
 
         const cards = userData.savedCards;
         setSavedCards(cards);
-        addDebugLog("Cards fetched", { count: cards.length });
 
         const defaultCard = cards.find(c => c.isDefault);
         if (defaultCard) {
           setSelectedCard(defaultCard);
-          addDebugLog("Default card set", defaultCard);
         }
       } catch (error) {
         console.error("Error fetching cards:", error);
-        addDebugLog("Error fetching cards", error.message);
       }
     };
 
@@ -130,7 +114,6 @@ export default function Checkout() {
         email: userData.email || prev.email,
         phone: userData.phone || prev.phone
       }));
-      addDebugLog("Form data updated from user profile");
     }
   }, [userData]);
 
@@ -138,7 +121,6 @@ export default function Checkout() {
   useEffect(() => {
     const fetchMenuItems = async () => {
       try {
-        addDebugLog("Fetching menu items");
         const menusCollection = collection(db, "menus");
         const querySnapshot = await getDocs(menusCollection);
         const dishesArray = [];
@@ -155,10 +137,9 @@ export default function Checkout() {
         });
         
         setMenuDishes(dishesArray);
-        addDebugLog("Menu items fetched", { count: dishesArray.length });
+        
       } catch (err) {
         console.error("Error fetching menu items: ", err);
-        addDebugLog("Error fetching menu items", err.message);
       }
     };
     
@@ -230,12 +211,6 @@ export default function Checkout() {
     const totalInPence = Math.round(total * 100);
     walletBalance = walletBalance || 0;
     
-    addDebugLog("Split payment calculation", {
-      walletBalance,
-      totalInPence,
-      total
-    });
-    
     if (walletBalance >= totalInPence) {
       return { walletAmount: totalInPence, stripeAmount: 0 };
     }
@@ -248,15 +223,12 @@ export default function Checkout() {
   // Test API endpoint
   const testAPIEndpoint = async () => {
     try {
-      addDebugLog("Testing API endpoint connection");
       const response = await fetch(
         `${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/health`
       );
       const data = await response.json();
-      addDebugLog("API health check response", data);
       return data.status === "ok";
     } catch (error) {
-      addDebugLog("API health check failed", error.message);
       return false;
     }
   };
@@ -267,8 +239,6 @@ export default function Checkout() {
     
     if (isPaying || isProcessingPayment) return;
     
-    addDebugLog("=== STARTING ORDER SUBMISSION ===");
-    
     // Validation
     if (!selectedAddress) {
       setAlert({
@@ -276,7 +246,6 @@ export default function Checkout() {
         type: "error"
       });
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      addDebugLog("Validation failed - No address selected");
       return;
     }
     
@@ -285,7 +254,6 @@ export default function Checkout() {
         message: "No available items in cart",
         type: "error"
       });
-      addDebugLog("Validation failed - No available items");
       return;
     }
     
@@ -294,7 +262,6 @@ export default function Checkout() {
         message: "Insufficient wallet balance. Please add funds or choose another payment method.",
         type: "error"
       });
-      addDebugLog("Validation failed - Insufficient wallet balance");
       return;
     }
     
@@ -303,7 +270,6 @@ export default function Checkout() {
         message: "Please select a payment method or add a new card",
         type: "error"
       });
-      addDebugLog("Validation failed - No card selected");
       return;
     }
 
@@ -311,7 +277,6 @@ export default function Checkout() {
       setIsPaying(true);
       setLoading(true);
       setIsProcessingPayment(true);
-      addDebugLog("Payment process started");
 
       // Test API connection first
       const apiHealthy = await testAPIEndpoint();
@@ -323,14 +288,6 @@ export default function Checkout() {
       const total = calculateTotal();
       const walletBalance = userData?.walletBalance || 0;
       const { walletAmount, stripeAmount } = splitPayment(walletBalance, total);
-      
-      addDebugLog("Payment split", {
-        total: total * 100,
-        walletBalance,
-        walletAmount,
-        stripeAmount,
-        paymentMethod: formData.paymentMethod
-      });
 
       // Prepare order items
       const orderItems = availableCartItems.map(item => {
@@ -367,16 +324,13 @@ export default function Checkout() {
         updatedAt: serverTimestamp()
       };
 
-      addDebugLog("Order data prepared", orderData);
 
       // 1️⃣ Create order in Firestore
       const orderRef = await addDoc(collection(db, "orders"), orderData);
       const orderId = orderRef.id;
-      addDebugLog("Order created in Firestore", { orderId });
 
       // 2️⃣ Handle wallet-only payment
       if (formData.paymentMethod === "wallet" && stripeAmount === 0) {
-        addDebugLog("Processing wallet-only payment");
         
         // Deduct from wallet
         if (walletAmount > 0 && userData?.uid) {
@@ -384,12 +338,6 @@ export default function Checkout() {
           await updateDoc(userRef, {
             walletBalance: walletBalance - walletAmount,
             updatedAt: serverTimestamp()
-          });
-          
-          addDebugLog("Wallet balance updated", {
-            previous: walletBalance,
-            deducted: walletAmount,
-            newBalance: walletBalance - walletAmount
           });
         }
         
@@ -401,8 +349,6 @@ export default function Checkout() {
           paidAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         });
-
-        addDebugLog("Order status updated to paid");
 
         // Set order details and confirm
         setOrderDetails({
@@ -416,13 +362,11 @@ export default function Checkout() {
         setIsPaying(false);
         setLoading(false);
         setIsProcessingPayment(false);
-        addDebugLog("=== WALLET-ONLY PAYMENT COMPLETED ===");
         return;
       }
 
       // 3️⃣ Handle card payment (with or without wallet)
       if (formData.paymentMethod === "card" && stripeAmount > 0) {
-        addDebugLog("Processing card payment", { stripeAmount });
         
         try {
           // Create payment intent
@@ -438,8 +382,6 @@ export default function Checkout() {
             paymentIntentData.paymentMethodId = selectedCard.id;
           }
 
-          addDebugLog("Sending payment intent request", paymentIntentData);
-
           const paymentIntentResponse = await fetch(
             `${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/payments/create-payment-intent`,
             {
@@ -449,23 +391,15 @@ export default function Checkout() {
             }
           );
 
-          addDebugLog("Payment intent response status", {
-            status: paymentIntentResponse.status,
-            ok: paymentIntentResponse.ok
-          });
-
           if (!paymentIntentResponse.ok) {
             const errorText = await paymentIntentResponse.text();
-            addDebugLog("Payment intent error response", errorText);
             throw new Error(`Payment server error: ${paymentIntentResponse.status}`);
           }
 
           const paymentIntentResult = await paymentIntentResponse.json();
-          addDebugLog("Payment intent created", paymentIntentResult);
 
           // Check if payment requires additional action
           if (paymentIntentResult.requiresAction) {
-            addDebugLog("Payment requires additional action", paymentIntentResult.nextAction);
             // Handle 3D Secure or other authentication
             const { error: confirmError } = await stripe.handleCardAction(
               paymentIntentResult.clientSecret
@@ -478,7 +412,6 @@ export default function Checkout() {
 
           // If wallet-only payment (shouldn't happen here but check)
           if (paymentIntentResult.walletOnly) {
-            addDebugLog("Unexpected wallet-only payment for card method");
             // Handle as wallet payment
             if (walletAmount > 0 && userData?.uid) {
               const userRef = doc(db, "users", userData.uid);
@@ -515,7 +448,6 @@ export default function Checkout() {
             let paymentResult;
             
             if (useNewCard) {
-              addDebugLog("Processing new card payment");
               // New card payment
               if (!stripe || !elements) {
                 throw new Error("Stripe not loaded. Please refresh the page.");
@@ -544,9 +476,7 @@ export default function Checkout() {
                 return_url: `${window.location.origin}/order-success/${orderId}`
               });
               
-              addDebugLog("New card payment result", paymentResult);
             } else if (selectedCard) {
-              addDebugLog("Processing saved card payment", { cardId: selectedCard.id });
               
               // For saved cards, we need to check if payment intent needs confirmation
               if (paymentIntentResult.requiresConfirmation || paymentIntentResult.status === 'requires_confirmation') {
@@ -557,7 +487,6 @@ export default function Checkout() {
               } else {
                 // If payment intent is already in a confirmable state, we can retrieve it
                 const paymentIntent = await stripe.retrievePaymentIntent(paymentIntentResult.clientSecret);
-                addDebugLog("Retrieved payment intent", paymentIntent);
                 
                 if (paymentIntent.paymentIntent && paymentIntent.paymentIntent.status === 'requires_confirmation') {
                   paymentResult = await stripe.confirmCardPayment(paymentIntentResult.clientSecret, {
@@ -568,20 +497,16 @@ export default function Checkout() {
                   paymentResult = { paymentIntent: paymentIntent.paymentIntent };
                 }
               }
-              
-              addDebugLog("Saved card payment result", paymentResult);
             } else {
               throw new Error("No payment method selected");
             }
 
             if (paymentResult.error) {
-              addDebugLog("Payment error", paymentResult.error);
               throw paymentResult.error;
             }
 
             // Payment succeeded
             if (paymentResult.paymentIntent && paymentResult.paymentIntent.status === "succeeded") {
-              addDebugLog("Payment succeeded", paymentResult.paymentIntent);
               
               // Deduct wallet amount if any
               if (walletAmount > 0 && userData?.uid) {
@@ -591,7 +516,6 @@ export default function Checkout() {
                   updatedAt: serverTimestamp()
                 });
                 
-                addDebugLog("Wallet amount deducted", { amount: walletAmount });
               }
 
               // Update order with payment success
@@ -605,8 +529,6 @@ export default function Checkout() {
                 updatedAt: serverTimestamp()
               });
 
-              addDebugLog("Order updated with payment success");
-
               setOrderDetails({
                 ...orderData,
                 id: orderId,
@@ -616,18 +538,14 @@ export default function Checkout() {
               
               clearCart();
               setOrderConfirmed(true);
-              addDebugLog("=== CARD PAYMENT COMPLETED SUCCESSFULLY ===");
             } else {
-              addDebugLog("Payment not completed", paymentResult);
               throw new Error("Payment not completed. Please try again.");
             }
           } else {
-            addDebugLog("No client secret in response", paymentIntentResult);
             throw new Error("Payment initialization failed. No client secret received.");
           }
         } catch (paymentError) {
           console.error("Payment processing error:", paymentError);
-          addDebugLog("Payment processing error", paymentError);
           
           // Update order with failure
           await updateDoc(orderRef, {
@@ -636,7 +554,6 @@ export default function Checkout() {
             updatedAt: serverTimestamp()
           });
           
-          addDebugLog("Order marked as failed", { error: paymentError.message });
           
           throw paymentError;
         }
@@ -644,7 +561,6 @@ export default function Checkout() {
 
     } catch (error) {
       console.error("Order submission error:", error);
-      addDebugLog("Order submission error", error);
       
       setAlert({
         message: error.message || "Failed to process order. Please try again.",
@@ -657,7 +573,6 @@ export default function Checkout() {
       setIsPaying(false);
       setLoading(false);
       setIsProcessingPayment(false);
-      addDebugLog("=== PAYMENT PROCESS ENDED ===");
     }
   };
 
@@ -896,91 +811,12 @@ export default function Checkout() {
         activeTab={activeTab}
       />
       
-      {/* Debug Toggle Button */}
-      <button
-        onClick={() => setShowDebug(!showDebug)}
-        className="fixed bottom-4 right-4 bg-gray-800 text-white px-3 py-2 rounded-lg text-sm z-50"
-      >
-        {showDebug ? 'Hide Debug' : 'Show Debug'}
-      </button>
-      
-      {/* Debug Panel */}
-      {showDebug && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] overflow-hidden">
-            <div className="p-4 bg-gray-800 text-white flex justify-between items-center">
-              <h3 className="font-bold">Debug Logs</h3>
-              <button onClick={() => setShowDebug(false)} className="text-white">Close</button>
-            </div>
-            <div className="p-4 overflow-y-auto max-h-[60vh]">
-              <div className="space-y-2">
-                {debugLogs.map((log, index) => (
-                  <div key={index} className="border-b pb-2">
-                    <div className="text-xs text-gray-500">{log.timestamp}</div>
-                    <div className="font-medium">{log.message}</div>
-                    {log.data && (
-                      <pre className="text-xs bg-gray-100 p-2 rounded mt-1 overflow-x-auto">
-                        {log.data}
-                      </pre>
-                    )}
-                  </div>
-                ))}
-                {debugLogs.length === 0 && (
-                  <div className="text-center text-gray-500 py-8">
-                    No debug logs yet. Try placing an order.
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="p-4 border-t">
-              <button
-                onClick={() => setDebugLogs([])}
-                className="px-3 py-1 bg-red-500 text-white rounded text-sm"
-              >
-                Clear Logs
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      
       <div className="md:flex md:justify-end">
         <div className={`pt-32 px-5 ${isSidebarOpen ? "md:w-[70%] lg:w-[75%]" : "md:w-full"} transition-all duration-500`}>
           <div className="max-w-7xl mx-auto pb-12 sm:px-6 lg:px-8">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-3">
                 <h3 className="text-own-2 mb-6 uppercase font-bold text-2xl font-display2 tracking-wider">Checkout</h3>
-                
-                {/* Debug Information Banner */}
-                <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-blue-800">Payment Debug Info</p>
-                      <p className="text-sm text-blue-600">
-                        API URL: {import.meta.env.VITE_API_URL || "http://localhost:5000"}
-                      </p>
-                      <p className="text-sm text-blue-600">
-                        User ID: {userData?.uid || "Not logged in"}
-                      </p>
-                      <p className="text-sm text-blue-600">
-                        Wallet Balance: {formatCurrency(userData?.walletBalance || 0)}
-                      </p>
-                    </div>
-                    <button
-                      onClick={async () => {
-                        const healthy = await testAPIEndpoint();
-                        setAlert({
-                          message: healthy ? "API is connected ✓" : "API connection failed ✗",
-                          type: healthy ? "success" : "error"
-                        });
-                      }}
-                      className="px-3 py-1 bg-blue-100 text-blue-700 rounded text-sm hover:bg-blue-200"
-                    >
-                      Test Connection
-                    </button>
-                  </div>
-                </div>
-                
                 <div className="max-w-7xl mx-auto pt-5 pb-12">
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Checkout Form */}
@@ -1313,7 +1149,7 @@ export default function Checkout() {
                                       }`}
                                     >
                                       <div>
-                                        <p className="font-semibold capitalize">
+                                        <p className="font-semibold capitalize text-black">
                                           {card.brand} •••• {card.last4}
                                         </p>
                                         <p className="text-sm text-gray-500">

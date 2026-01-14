@@ -221,7 +221,7 @@ export default function Favorites() {
     <>
       <UserNavBar 
         toggleSidebar={toggleSidebars} 
-        isSidebarOpen={isSidebarOpen}
+        isSideBarOpen={isSidebarOpen}
         user={userData}
       />
       <UserSideBar 
@@ -231,7 +231,7 @@ export default function Favorites() {
         setActiveTab={setActiveTab} 
         activeTab={activeTab}
       />
-      <div className="md:flex md:justify-end">
+      <div className="md:flex  md:justify-end">
         <div className={`pt-32 px-5 ${isSidebarOpen ? "md:w-[70%] lg:w-[75%]" : "md:w-full"} transition-all duration-500`}>
           <div className="max-w-7xl mx-auto pb-12 sm:px-6 lg:px-8">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
