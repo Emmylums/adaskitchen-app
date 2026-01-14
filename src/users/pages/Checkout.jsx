@@ -34,7 +34,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebaseConfig";
 import { CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
-import { createNotification, NotificationTemplates } from "../../services/notificationService";
+import { createNotification, NotificationTemplates } from "../services/notificationService";
 
 export default function Checkout() {
   // Move all hooks to the top level - NO CONDITIONAL HOOKS
