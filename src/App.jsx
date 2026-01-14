@@ -64,7 +64,7 @@ function App() {
         <Route exact path="/Home" element={<Home/>}/>
         <Route exact path="/Our Story" element={<OurStory/>}/>
         <Route exact path="/Menu" element={<Menu/>}/>
-        <Route exact path="/Catering" element={<Catering/>}/>
+        {/* <Route exact path="/Catering" element={<Catering/>}/> */}
         {/* <Route exact path="/Gallery" element={<Gallery/>}/> */}
         <Route exact path="/Terms&Conditions" element={<TermsAndConditions/>}/>
         <Route exact path="/Privacy Policy" element={<PrivacyPolicy/>}/>
@@ -115,7 +115,7 @@ function App() {
         <Route path="/admin/Menu" element={<MenuManagement />} />
         <Route path="/admin/Categories" element={<Categories />} />
         <Route path="/admin/Gallery" element={<Gallery />} />
-        <Route path="/admin/Catering" element={<ACatering />} />
+        {/* <Route path="/admin/Catering" element={<ACatering />} /> */}
         <Route path="/admin/Orders" element={<Orders />} />
         <Route path="/admin/Invoices" element={<Invoices />} />
         <Route path="/admin/settings" element={<Settings />} />

@@ -180,15 +180,18 @@ export default function Payments() {
 
       console.log("Sending wallet top-up request:", requestBody);
 
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/payments/add-money-to-wallet`,
+      // Update the payment intent creation call:
+      const paymentIntentResponse = await fetch(
+        `${import.meta.env.VITE_API_URL || "https://adaskitchen-backend.vercel.app/api"}/payments/create-payment-intent`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(requestBody)
+          headers: { 
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
+          body: JSON.stringify(paymentIntentData)
         }
       );
-
       const data = await response.json();
 
       if (!response.ok) {
@@ -308,16 +311,19 @@ export default function Payments() {
     try {
       // 1. Create setup intent
       const setupIntentResponse = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/payments/create-setup-intent`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId: userData.uid,
-            email: userData.email
-          })
-        }
-      );
+      `${import.meta.env.VITE_API_URL || "https://adaskitchen-backend.vercel.app/api"}/payments/create-setup-intent`,
+      {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({
+          userId: userData.uid,
+          email: userData.email
+        })
+      }
+    );
 
       if (!setupIntentResponse.ok) {
         const errorData = await setupIntentResponse.json();
@@ -408,9 +414,13 @@ export default function Payments() {
 
     try {
       // Update Stripe
-      const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:5000"}/payments/set-default-card`, {
+      // Update the set default card endpoint:
+      const response = await fetch(`${import.meta.env.VITE_API_URL || "https://adaskitchen-backend.vercel.app/api"}/payments/set-default-card`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
         body: JSON.stringify({
           customerId: userData.stripeCustomerId,
           paymentMethodId: paymentMethodId,
@@ -470,11 +480,15 @@ export default function Payments() {
 
     try {
       // Remove from Stripe
+      // Update the remove card endpoint:
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/payments/card/${paymentMethodId}`,
+        `${import.meta.env.VITE_API_URL || "https://adaskitchen-backend.vercel.app/api"}/payments/card/${paymentMethodId}`,
         {
           method: "DELETE",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
           body: JSON.stringify({ userId: userData.uid })
         }
       );

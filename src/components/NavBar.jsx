@@ -46,7 +46,7 @@ const NavBar = ({onToggleMobileNavBar, activeLink}) => {
         { name: "Home"},
         { name: "Menu"},
         { name: "Our Story"},
-        { name: "Catering"},
+        // { name: "Catering"},
         { name: "Cart"},
         { name: "Login"},
     ];
