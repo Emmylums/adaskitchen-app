@@ -26,7 +26,7 @@ import {
   arrayUnion,
   getDoc
 } from "firebase/firestore";
-import { db } from "../../firebaseConfig"; 
+import { db } from "../../firebaseConfig";
 import { createNotification, NotificationTemplates } from "../services/notificationService";
 
 export default function Payments() {
@@ -208,6 +208,11 @@ export default function Payments() {
         // Refresh user data manually
         await refreshUserData();
 
+        // Create wallet top-up notification
+        await createNotification(userData.uid,
+          NotificationTemplates.WALLET_TOPUP(amountInPence, (userData?.walletBalance || 0) + amountInPence)
+        );
+
         // Show success
         setAlert({
           message: `Successfully added ${formatCurrency(amountInPence)} to your wallet!`,
@@ -255,6 +260,11 @@ export default function Payments() {
       if (paymentIntent.status === 'succeeded') {
         // Refresh user data
         await refreshUserData();
+
+        // Create wallet top-up notification
+        await createNotification(userData.uid,
+          NotificationTemplates.WALLET_TOPUP(paymentIntent.amount, (userData?.walletBalance || 0) + paymentIntent.amount)
+        );
 
         setAlert({
           message: `Successfully added ${formatCurrency(paymentIntent.amount)} to your wallet!`,
@@ -360,6 +370,11 @@ export default function Payments() {
       // 5. Refresh data manually
       await refreshUserData();
 
+      // Create card added notification
+      await createNotification(userData.uid,
+        NotificationTemplates.CARD_ADDED(paymentMethod.card.last4, paymentMethod.card.brand)
+      );
+
       setAlert({
         message: "Card saved successfully!",
         type: "success"
@@ -424,6 +439,14 @@ export default function Payments() {
       setDefaultCardId(paymentMethodId);
       setSavedCards(updatedCards);
 
+      // Create default card changed notification
+      const card = savedCards.find(c => c.id === paymentMethodId);
+      if (card) {
+        await createNotification(userData.uid,
+          NotificationTemplates.DEFAULT_CARD_CHANGED(card.last4, card.brand)
+        );
+      }
+
       setAlert({
         message: "Default card updated successfully!",
         type: "success"
@@ -463,6 +486,14 @@ export default function Payments() {
       // Update local state
       const updatedCards = savedCards.filter(card => card.id !== paymentMethodId);
       setSavedCards(updatedCards);
+
+      // Create card removed notification
+      const removedCard = savedCards.find(c => c.id === paymentMethodId);
+      if (removedCard) {
+        await createNotification(userData.uid,
+          NotificationTemplates.CARD_REMOVED(removedCard.last4, removedCard.brand)
+        );
+      }
 
       // If removed card was default, set a new default or clear
       if (paymentMethodId === defaultCardId) {

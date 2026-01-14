@@ -105,7 +105,7 @@ function App() {
         <Route path="/user/Notifications" element={<Notifications />} />
         <Route path="/user/Favorites" element={<Favorites />} />
         <Route path="/user/Addresses" element={<Addresses />} />
-        <Route path="/user/Support" element={<Support />} />
+        {/* <Route path="/user/Support" element={<Support />} /> */}
         <Route path="/user/Settings" element={<USettings />} />
  
 

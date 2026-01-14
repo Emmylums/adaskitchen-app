@@ -12,8 +12,25 @@ import {
   doc, 
   updateDoc,
   getDoc,
-  Timestamp 
+  Timestamp,
+  onSnapshot
 } from "firebase/firestore";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { 
+  faCheck,
+  faTrash,
+  faBell,
+  faShoppingBag,
+  faCreditCard,
+  faMapMarkerAlt,
+  faUser,
+  faLock,
+  faExclamationTriangle,
+  faGift,
+  faTruck,
+  faHome,
+  faClock
+} from "@fortawesome/free-solid-svg-icons";
 
 export default function Notifications() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -24,24 +41,25 @@ export default function Notifications() {
   const [activeTab, setActiveTab] = useState("Notifications");
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
   
   const { user } = useAuth();
   const { userData, loading: userLoading } = useUserData();
 
-  // Fetch user notifications from Firestore subcollection
+  // Fetch user notifications from Firestore
   useEffect(() => {
-    const fetchNotifications = async () => {
-      if (!user) {
-        setLoading(false);
-        return;
-      }
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
+    const fetchAllNotifications = async () => {
       try {
         setLoading(true);
+        const allNotifications = [];
         
-        // Try to fetch from notifications subcollection
+        // 1. Try to fetch from notifications subcollection
         try {
-          // Reference to the notifications subcollection under the user document
           const notificationsRef = collection(db, "users", user.uid, "notifications");
           const notificationsQuery = query(
             notificationsRef,
@@ -49,49 +67,40 @@ export default function Notifications() {
           );
           
           const querySnapshot = await getDocs(notificationsQuery);
-          const fetchedNotifications = [];
           
           querySnapshot.forEach((doc) => {
             const data = doc.data();
-            
-            // Convert createdAt to Date object
             let createdAtDate;
+            
             if (data.createdAt) {
-              // Check if createdAt is a Firestore Timestamp
               if (data.createdAt.toDate) {
                 createdAtDate = data.createdAt.toDate();
-              } 
-              // Check if createdAt is a string (ISO format)
-              else if (typeof data.createdAt === 'string') {
+              } else if (typeof data.createdAt === 'string') {
                 createdAtDate = new Date(data.createdAt);
-              }
-              // Check if createdAt is a number (timestamp)
-              else if (typeof data.createdAt === 'number') {
+              } else if (typeof data.createdAt === 'number') {
                 createdAtDate = new Date(data.createdAt);
-              }
-              // If it's already a Date object
-              else if (data.createdAt instanceof Date) {
+              } else if (data.createdAt instanceof Date) {
                 createdAtDate = data.createdAt;
               }
             } else {
-              // Fallback to current date
               createdAtDate = new Date();
             }
             
-            fetchedNotifications.push({ 
+            allNotifications.push({ 
               id: doc.id, 
               ...data,
               createdAt: createdAtDate,
-              time: formatTimeAgo(createdAtDate)
+              time: formatTimeAgo(createdAtDate),
+              source: 'subcollection'
             });
           });
           
-          setNotifications(fetchedNotifications);
-          return; // Success, exit early
-          
         } catch (collectionError) {
-          
-          // Fallback to notifications array in user document
+          console.log("Subcollection not available:", collectionError);
+        }
+        
+        // 2. Also fetch from user document array (for backward compatibility)
+        try {
           const userDocRef = doc(db, "users", user.uid);
           const userDoc = await getDoc(userDocRef);
           
@@ -99,10 +108,9 @@ export default function Notifications() {
             const data = userDoc.data();
             const userNotifications = data.notifications || [];
             
-            // Format time for each notification
-            const formattedNotifications = userNotifications.map(notification => {
-              // Convert createdAt to Date object
+            userNotifications.forEach(notification => {
               let createdAtDate;
+              
               if (notification.createdAt) {
                 if (typeof notification.createdAt === 'string') {
                   createdAtDate = new Date(notification.createdAt);
@@ -119,16 +127,32 @@ export default function Notifications() {
                 createdAtDate = new Date();
               }
               
-              return {
-                ...notification,
-                createdAt: createdAtDate,
-                time: formatTimeAgo(createdAtDate)
-              };
-            }).sort((a, b) => b.createdAt - a.createdAt); // Sort by date (newest first)
-            
-            setNotifications(formattedNotifications);
+              // Only add if not already in allNotifications (avoid duplicates)
+              const exists = allNotifications.some(n => n.id === notification.id);
+              if (!exists) {
+                allNotifications.push({
+                  ...notification,
+                  createdAt: createdAtDate,
+                  time: formatTimeAgo(createdAtDate),
+                  source: 'user-doc'
+                });
+              }
+            });
           }
+        } catch (userDocError) {
+          console.log("Error fetching user doc notifications:", userDocError);
         }
+        
+        // Sort all notifications by date (newest first)
+        const sortedNotifications = allNotifications.sort((a, b) => 
+          b.createdAt - a.createdAt
+        );
+        
+        setNotifications(sortedNotifications);
+        
+        // Calculate unread count
+        const unread = sortedNotifications.filter(notif => !notif.read).length;
+        setUnreadCount(unread);
         
       } catch (error) {
         console.error("Error fetching notifications:", error);
@@ -138,7 +162,63 @@ export default function Notifications() {
       }
     };
 
-    fetchNotifications();
+    fetchAllNotifications();
+
+    // Set up real-time listener for new notifications
+    if (user) {
+      const notificationsRef = collection(db, "users", user.uid, "notifications");
+      const notificationsQuery = query(
+        notificationsRef,
+        orderBy("createdAt", "desc")
+      );
+
+      const unsubscribe = onSnapshot(notificationsQuery, (snapshot) => {
+        const newNotifications = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          let createdAtDate;
+          
+          if (data.createdAt) {
+            if (data.createdAt.toDate) {
+              createdAtDate = data.createdAt.toDate();
+            } else if (typeof data.createdAt === 'string') {
+              createdAtDate = new Date(data.createdAt);
+            } else if (typeof data.createdAt === 'number') {
+              createdAtDate = new Date(data.createdAt);
+            } else if (data.createdAt instanceof Date) {
+              createdAtDate = data.createdAt;
+            }
+          } else {
+            createdAtDate = new Date();
+          }
+          
+          newNotifications.push({ 
+            id: doc.id, 
+            ...data,
+            createdAt: createdAtDate,
+            time: formatTimeAgo(createdAtDate),
+            source: 'subcollection'
+          });
+        });
+        
+        // Merge with existing notifications
+        setNotifications(prev => {
+          const merged = [...newNotifications];
+          prev.forEach(prevNotif => {
+            if (!merged.some(n => n.id === prevNotif.id)) {
+              merged.push(prevNotif);
+            }
+          });
+          return merged.sort((a, b) => b.createdAt - a.createdAt);
+        });
+        
+        // Update unread count
+        const unread = newNotifications.filter(notif => !notif.read).length;
+        setUnreadCount(prev => prev + unread);
+      });
+
+      return () => unsubscribe();
+    }
   }, [user]);
 
   // Function to mark notification as read
@@ -146,18 +226,18 @@ export default function Notifications() {
     if (!user) return;
     
     try {
-      // Try to update in notifications subcollection first
+      const notification = notifications.find(n => n.id === notificationId);
+      if (!notification) return;
+
+      // Update in notifications subcollection
       try {
         const notificationDocRef = doc(db, "users", user.uid, "notifications", notificationId);
         await updateDoc(notificationDocRef, {
           read: true,
-          readAt: new Date().toISOString() // Store as ISO string
+          readAt: new Date().toISOString()
         });
-        
       } catch (error) {
-
-        
-        // Update in user document array
+        // Fallback to user document array
         const userDocRef = doc(db, "users", user.uid);
         const userDoc = await getDoc(userDocRef);
         
@@ -165,7 +245,6 @@ export default function Notifications() {
           const data = userDoc.data();
           const userNotifications = data.notifications || [];
           
-          // Find and update the notification
           const updatedNotifications = userNotifications.map(notif => 
             notif.id === notificationId ? { 
               ...notif, 
@@ -191,6 +270,9 @@ export default function Notifications() {
         )
       );
       
+      // Update unread count
+      setUnreadCount(prev => Math.max(0, prev - 1));
+      
     } catch (error) {
       console.error("Error marking notification as read:", error);
       // Fallback: update local state only
@@ -203,6 +285,7 @@ export default function Notifications() {
           } : notif
         )
       );
+      setUnreadCount(prev => Math.max(0, prev - 1));
     }
   };
 
@@ -215,42 +298,20 @@ export default function Notifications() {
       
       if (unreadNotifications.length === 0) return;
       
-      // Try to update in notifications subcollection
-      try {
-        // Update each unread notification in subcollection
-        const updatePromises = unreadNotifications.map(async (notif) => {
+      // Update each unread notification
+      const updatePromises = unreadNotifications.map(async (notif) => {
+        try {
           const notificationDocRef = doc(db, "users", user.uid, "notifications", notif.id);
           await updateDoc(notificationDocRef, {
             read: true,
             readAt: new Date().toISOString()
           });
-        });
-        
-        await Promise.all(updatePromises);
-        
-      } catch (error) {
-
-        
-        // Update in user document array
-        const userDocRef = doc(db, "users", user.uid);
-        const userDoc = await getDoc(userDocRef);
-        
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          const userNotifications = data.notifications || [];
-          
-          // Mark all as read
-          const updatedNotifications = userNotifications.map(notif => ({
-            ...notif,
-            read: true,
-            readAt: notif.read ? notif.readAt : new Date().toISOString()
-          }));
-          
-          await updateDoc(userDocRef, {
-            notifications: updatedNotifications
-          });
+        } catch (error) {
+          // Fallback not needed here since we're updating all
         }
-      }
+      });
+      
+      await Promise.all(updatePromises);
       
       // Update local state
       setNotifications(prev => 
@@ -260,6 +321,9 @@ export default function Notifications() {
           readAt: notif.read ? notif.readAt : new Date().toISOString()
         }))
       );
+      
+      // Reset unread count
+      setUnreadCount(0);
       
     } catch (error) {
       console.error("Error marking all as read:", error);
@@ -271,14 +335,14 @@ export default function Notifications() {
           readAt: notif.read ? notif.readAt : new Date().toISOString()
         }))
       );
+      setUnreadCount(0);
     }
   };
 
-  // Function to format time ago - FIXED to handle all date formats
+  // Function to format time ago
   const formatTimeAgo = (dateInput) => {
     let date;
     
-    // Handle different input types
     if (dateInput instanceof Date) {
       date = dateInput;
     } else if (typeof dateInput === 'string') {
@@ -286,13 +350,11 @@ export default function Notifications() {
     } else if (typeof dateInput === 'number') {
       date = new Date(dateInput);
     } else if (dateInput?.toDate) {
-      // Firestore Timestamp
       date = dateInput.toDate();
     } else {
       date = new Date();
     }
     
-    // Check if date is valid
     if (isNaN(date.getTime())) {
       return "Recently";
     }
@@ -330,23 +392,31 @@ export default function Notifications() {
   const getNotificationIcon = (type) => {
     switch (type) {
       case 'order':
-        return '📦';
+        return <FontAwesomeIcon icon={faShoppingBag} className="text-own-2" />;
       case 'payment':
-        return '💰';
+        return <FontAwesomeIcon icon={faCreditCard} className="text-green-500" />;
       case 'promotion':
-        return '🎉';
+        return <FontAwesomeIcon icon={faGift} className="text-purple-500" />;
       case 'system':
-        return '⚙️';
+        return <FontAwesomeIcon icon={faBell} className="text-blue-500" />;
       case 'delivery':
-        return '🚚';
+        return <FontAwesomeIcon icon={faTruck} className="text-orange-500" />;
       case 'warning':
-        return '⚠️';
+        return <FontAwesomeIcon icon={faExclamationTriangle} className="text-red-500" />;
       case 'success':
-        return '✅';
+        return <FontAwesomeIcon icon={faCheck} className="text-green-500" />;
       case 'welcome':
-        return '👋';
+        return <FontAwesomeIcon icon={faHome} className="text-own-2" />;
+      case 'address':
+        return <FontAwesomeIcon icon={faMapMarkerAlt} className="text-blue-500" />;
+      case 'wallet':
+        return <FontAwesomeIcon icon={faCreditCard} className="text-green-500" />;
+      case 'security':
+        return <FontAwesomeIcon icon={faLock} className="text-red-500" />;
+      case 'profile':
+        return <FontAwesomeIcon icon={faUser} className="text-gray-500" />;
       default:
-        return '🔔';
+        return <FontAwesomeIcon icon={faBell} className="text-gray-400" />;
     }
   };
 
@@ -361,9 +431,14 @@ export default function Notifications() {
       try {
         // Note: In a real app, you would delete from Firestore
         // For now, we'll just update local state
-
       } catch (error) {
-
+        // Silently fail
+      }
+      
+      // Check if notification was unread to update count
+      const notification = notifications.find(n => n.id === notificationId);
+      if (notification && !notification.read) {
+        setUnreadCount(prev => Math.max(0, prev - 1));
       }
       
       // Update local state
@@ -384,9 +459,30 @@ export default function Notifications() {
       // In a real app, you would delete from Firestore
       // For now, just update local state
       setNotifications([]);
+      setUnreadCount(0);
       
     } catch (error) {
       console.error("Error clearing notifications:", error);
+    }
+  };
+
+  // Function to get notification background color based on type
+  const getNotificationBgColor = (type) => {
+    switch (type) {
+      case 'order':
+        return 'bg-amber-50';
+      case 'payment':
+        return 'bg-green-50';
+      case 'promotion':
+        return 'bg-purple-50';
+      case 'warning':
+        return 'bg-red-50';
+      case 'success':
+        return 'bg-green-50';
+      case 'security':
+        return 'bg-red-50';
+      default:
+        return 'bg-gray-50';
     }
   };
 
@@ -404,8 +500,6 @@ export default function Notifications() {
       </div>
     );
   }
-
-  const unreadCount = notifications.filter(notif => !notif.read).length;
 
   return (
     <>
@@ -434,7 +528,11 @@ export default function Notifications() {
                       {notifications.length > 0 && (
                         <p className="text-sm text-gray-500 mt-1">
                           {notifications.length} notification{notifications.length !== 1 ? 's' : ''}
-                          {unreadCount > 0 && ` • ${unreadCount} unread`}
+                          {unreadCount > 0 && (
+                            <span className="ml-2 bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">
+                              {unreadCount} unread
+                            </span>
+                          )}
                         </p>
                       )}
                     </div>
@@ -443,8 +541,9 @@ export default function Notifications() {
                       {unreadCount > 0 && (
                         <button 
                           onClick={markAllAsRead}
-                          className="px-4 py-2 text-sm bg-own-2 text-white rounded-xl hover:bg-amber-600 transition-colors"
+                          className="px-4 py-2 text-sm bg-own-2 text-white rounded-xl hover:bg-amber-600 transition-colors flex items-center gap-2"
                         >
+                          <FontAwesomeIcon icon={faCheck} />
                           Mark all as read
                         </button>
                       )}
@@ -452,8 +551,9 @@ export default function Notifications() {
                       {notifications.length > 0 && (
                         <button 
                           onClick={clearAllNotifications}
-                          className="px-4 py-2 text-sm border border-red-300 text-red-600 rounded-xl hover:bg-red-50 transition-colors"
+                          className="px-4 py-2 text-sm border border-red-300 text-red-600 rounded-xl hover:bg-red-50 transition-colors flex items-center gap-2"
                         >
+                          <FontAwesomeIcon icon={faTrash} />
                           Clear all
                         </button>
                       )}
@@ -465,18 +565,25 @@ export default function Notifications() {
                       {notifications.map((notification) => (
                         <div 
                           key={notification.id} 
-                          className={`p-4 border border-gray-200 rounded-xl flex items-start gap-4 transition-all ${!notification.read ? 'bg-amber-50 border-amber-200' : 'hover:bg-gray-50'}`}
+                          className={`p-4 border border-gray-200 rounded-xl flex items-start gap-4 transition-all ${
+                            !notification.read ? 'bg-amber-50 border-amber-200' : getNotificationBgColor(notification.type)
+                          }`}
                         >
-                          <div className="text-2xl mt-1">
+                          <div className="mt-1">
                             {getNotificationIcon(notification.type)}
                           </div>
                           
                           <div className="flex-1 min-w-0">
                             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
                               <div className="flex-1">
-                                <h4 className="font-semibold text-gray-800">
-                                  {notification.title || "Notification"}
-                                </h4>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <h4 className="font-semibold text-gray-800">
+                                    {notification.title || "Notification"}
+                                  </h4>
+                                  {!notification.read && (
+                                    <span className="w-2 h-2 bg-own-2 rounded-full"></span>
+                                  )}
+                                </div>
                                 <p className="text-gray-600 mt-1">
                                   {notification.message || notification.description}
                                 </p>
@@ -492,6 +599,12 @@ export default function Notifications() {
                                     Amount: £{(notification.amount / 100).toFixed(2)}
                                   </p>
                                 )}
+                                
+                                {notification.orderNumber && (
+                                  <p className="text-sm text-gray-700 mt-1">
+                                    Order #: {notification.orderNumber}
+                                  </p>
+                                )}
                               </div>
                               
                               <div className="flex flex-col items-end gap-2">
@@ -499,21 +612,25 @@ export default function Notifications() {
                                   {notification.time || formatTimeAgo(notification.createdAt)}
                                 </span>
                                 
-                                {!notification.read && (
+                                <div className="flex gap-2">
+                                  {!notification.read && (
+                                    <button 
+                                      onClick={() => markAsRead(notification.id)}
+                                      className="text-sm text-own-2 hover:text-amber-600 font-medium flex items-center gap-1"
+                                    >
+                                      <FontAwesomeIcon icon={faCheck} className="text-xs" />
+                                      Mark read
+                                    </button>
+                                  )}
+                                  
                                   <button 
-                                    onClick={() => markAsRead(notification.id)}
-                                    className="text-sm text-own-2 hover:text-amber-600 font-medium"
+                                    onClick={() => deleteNotification(notification.id)}
+                                    className="text-sm text-gray-500 hover:text-red-600 flex items-center gap-1"
                                   >
-                                    Mark as read
+                                    <FontAwesomeIcon icon={faTrash} className="text-xs" />
+                                    Delete
                                   </button>
-                                )}
-                                
-                                <button 
-                                  onClick={() => deleteNotification(notification.id)}
-                                  className="text-sm text-gray-500 hover:text-red-600"
-                                >
-                                  Delete
-                                </button>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -522,13 +639,38 @@ export default function Notifications() {
                     </div>
                   ) : (
                     <div className="text-center py-12">
-                      <div className="text-5xl mb-4">🔔</div>
+                      <div className="text-5xl mb-4">
+                        <FontAwesomeIcon icon={faBell} className="text-gray-300" />
+                      </div>
                       <h4 className="text-xl font-semibold text-gray-700 mb-3">
                         No notifications yet
                       </h4>
                       <p className="text-gray-500 max-w-md mx-auto">
                         You're all caught up! When you have new orders, promotions, or account updates, they'll appear here.
                       </p>
+                      <div className="mt-6 p-4 bg-gray-50 rounded-lg max-w-md mx-auto">
+                        <p className="text-sm text-gray-600">
+                          <span className="font-medium">Types of notifications you'll receive:</span>
+                        </p>
+                        <ul className="text-sm text-gray-500 mt-2 space-y-1">
+                          <li className="flex items-center gap-2">
+                            <FontAwesomeIcon icon={faShoppingBag} className="text-own-2 text-xs" />
+                            Order confirmations and updates
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <FontAwesomeIcon icon={faCreditCard} className="text-green-500 text-xs" />
+                            Payment successes and failures
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <FontAwesomeIcon icon={faMapMarkerAlt} className="text-blue-500 text-xs" />
+                            Address changes
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <FontAwesomeIcon icon={faGift} className="text-purple-500 text-xs" />
+                            Promotions and offers
+                          </li>
+                        </ul>
+                      </div>
                     </div>
                   )}
                 </div>

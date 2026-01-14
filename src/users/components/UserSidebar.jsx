@@ -151,7 +151,7 @@ const UserSideBar = ({ isOpen, closeSidebar, activeTab, setActiveTab, userData }
                 { id: "Favorites", icon: faHeart, label: "Favorites", path: "/user/favorites" },
                 { id: "Addresses", icon: faMapMarkerAlt, label: "Addresses", path: "/user/addresses" },
                 // { id: "Security", icon: faShieldAlt, label: "Security", path: "/user/security" },
-                { id: "Support", icon: faQuestionCircle, label: "Help & Support", path: "/user/support" },
+                // { id: "Support", icon: faQuestionCircle, label: "Help & Support", path: "/user/support" },
                 { id: "Settings", icon: faCog, label: "Settings", path: "/user/settings" }
               ].map((item) => (
                 <Link to={item.path} key={item.id}>
