@@ -54,7 +54,13 @@ export default function Invoices() {
   const toggleSidebars = () => {
     setIsSidebarOpen(prev => !prev);
   };
-  
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: 'GBP',
+      minimumFractionDigits: 2
+    }).format(amount / 1);
+  };
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
@@ -343,15 +349,15 @@ export default function Invoices() {
       
       invoice.items?.forEach((item, index) => {
         invoiceText += `${index + 1}. ${item.name}\n`;
-        invoiceText += `   Quantity: ${item.quantity} x ₦${item.price?.toLocaleString()} = ₦${item.total?.toLocaleString()}\n`;
+        invoiceText += `   Quantity: ${item.quantity} x ${formatCurrency(item.price)} = ${formatCurrency(item.total)}\n`;
       });
       
       invoiceText += `\nSummary:\n`;
       invoiceText += `========================\n`;
-      invoiceText += `Subtotal: ₦${invoice.subtotal?.toLocaleString()}\n`;
-      if (invoice.tax > 0) invoiceText += `Tax (7.5%): ₦${invoice.tax?.toFixed(2)}\n`;
-      if (invoice.discount > 0) invoiceText += `Discount: -₦${invoice.discount?.toLocaleString()}\n`;
-      invoiceText += `Total: ₦${invoice.total?.toLocaleString()}\n\n`;
+      invoiceText += `Subtotal: ${formatCurrency(invoice.subtotal)}\n`;
+      if (invoice.tax > 0) invoiceText += `Tax (7.5%): ${formatCurrency(invoice.tax)}\n`;
+      if (invoice.discount > 0) invoiceText += `Discount: -${formatCurrency(invoice.discount)}\n`;
+      invoiceText += `Total: ${formatCurrency(invoice.total)}\n\n`;
       
       if (invoice.notes) {
         invoiceText += `Notes:\n${invoice.notes}\n\n`;
@@ -967,7 +973,7 @@ export default function Invoices() {
                               {invoiceForm.items.map((item, index) => (
                                 <tr key={index} className="border-b border-gray-100">
                                   <td className="py-3 px-4">{item.name}</td>
-                                  <td className="py-3 px-4">₦{item.price?.toLocaleString()}</td>
+                                  <td className="py-3 px-4">₦{formatCurrency(item.price)}</td>
                                   <td className="py-3 px-4">{item.quantity}</td>
                                   <td className="py-3 px-4 font-medium">₦{item.total?.toLocaleString()}</td>
                                 </tr>
@@ -1221,9 +1227,9 @@ export default function Invoices() {
                             {selectedInvoice.items?.map((item, index) => (
                               <tr key={index} className="border-b border-gray-100">
                                 <td className="py-3 px-4">{item.name}</td>
-                                <td className="py-3 px-4">₦{item.price?.toLocaleString()}</td>
+                                <td className="py-3 px-4">₦{formatCurrency(item.price)}</td>
                                 <td className="py-3 px-4">{item.quantity}</td>
-                                <td className="py-3 px-4 font-medium">₦{item.total?.toLocaleString()}</td>
+                                <td className="py-3 px-4 font-medium">₦{formatCurrency(item.total)}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -1239,24 +1245,24 @@ export default function Invoices() {
                       <div className="space-y-2">
                         <div className="flex justify-between">
                           <span>Subtotal:</span>
-                          <span>₦{selectedInvoice.subtotal?.toLocaleString()}</span>
+                          <span>{formatCurrency(selectedInvoice.subtotal)}</span>
                         </div>
                         {selectedInvoice.tax > 0 && (
                           <div className="flex justify-between">
                             <span>Tax (7.5%):</span>
-                            <span>₦{selectedInvoice.tax?.toFixed(2)}</span>
+                            <span>{formatCurrency(selectedInvoice.tax)}</span>
                           </div>
                         )}
                         {selectedInvoice.discount > 0 && (
                           <div className="flex justify-between">
                             <span>Discount:</span>
-                            <span>-₦{selectedInvoice.discount?.toLocaleString()}</span>
+                            <span>-{formatCurrency(selectedInvoice.discount)}</span>
                           </div>
                         )}
                         <div className="border-t border-gray-300 pt-2 mt-2">
                           <div className="flex justify-between font-bold text-lg">
                             <span>Total:</span>
-                            <span className="text-own-2">₦{selectedInvoice.total?.toLocaleString()}</span>
+                            <span className="text-own-2">{formatCurrency(selectedInvoice.total)}</span>
                           </div>
                         </div>
                       </div>
@@ -1373,7 +1379,7 @@ export default function Invoices() {
                               <td className="py-2">{item.name}</td>
                               <td className="text-right py-2">₦{item.price?.toLocaleString()}</td>
                               <td className="text-right py-2">{item.quantity}</td>
-                              <td className="text-right py-2 font-medium">₦{item.total?.toLocaleString()}</td>
+                              <td className="text-right py-2 font-medium">₦{formatCurrency(item.total)}</td>
                             </tr>
                           ))}
                         </tbody>

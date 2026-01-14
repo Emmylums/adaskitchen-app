@@ -67,6 +67,13 @@ export default function MenuManagement() {
     available: true
   });
   
+    const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: 'GBP',
+      minimumFractionDigits: 2
+    }).format(amount / 1);
+  };
   // Modal states
   const [showMenuModal, setShowMenuModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -177,7 +184,7 @@ export default function MenuManagement() {
     setMenuForm({
       name: item.name,
       description: item.description,
-      price: item.price.toString(),
+      price: item.price,
       category: item.category || "",
       ingredients: item.ingredients || [""],
       preparationTime: item.preparationTime || 30,
@@ -417,7 +424,7 @@ export default function MenuManagement() {
                               <h3 className="font-bold text-lg text-own-2">{item.name}</h3>
                               <p className="text-sm text-gray-500">{item.category}</p>
                             </div>
-                            <span className="font-bold text-own-2 text-lg">₦{item.price?.toLocaleString()}</span>
+                            <span className="font-bold text-own-2 text-lg">{formatCurrency(item.price)}</span>
                           </div>
                           
                           <p className="text-gray-600 text-sm mb-4 line-clamp-2">{item.description}</p>
@@ -577,7 +584,7 @@ export default function MenuManagement() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Price (₦) *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Price (£) *</label>
                       <input
                         type="number"
                         required
@@ -586,7 +593,7 @@ export default function MenuManagement() {
                         className="w-full px-4 py-3 border text-black border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
                         value={menuForm.price}
                         onChange={(e) => setMenuForm({...menuForm, price: e.target.value})}
-                        placeholder="3000"
+                        placeholder="50"
                       />
                     </div>
                   </div>

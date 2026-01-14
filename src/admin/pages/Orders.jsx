@@ -64,7 +64,14 @@ export default function Orders() {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: 'GBP',
+      minimumFractionDigits: 2
+    }).format(amount / 1);
+  };
+
   // Mock user data
   const userData = {
     name: "Ada Johnson",
@@ -645,7 +652,7 @@ export default function Orders() {
                 <div className="text-sm text-gray-600">Today</div>
               </div>
               <div className="bg-white p-4 rounded-xl shadow">
-                <div className="text-2xl font-bold text-emerald-600">₦{orderStats.revenue.toLocaleString()}</div>
+                <div className="text-2xl font-bold text-emerald-600">{formatCurrency(orderStats.revenue)}</div>
                 <div className="text-sm text-gray-600">Revenue</div>
               </div>
             </div>
@@ -773,7 +780,7 @@ export default function Orders() {
                                 </span>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-medium text-gray-900">₦{order.total?.toLocaleString()}</div>
+                                <div className="text-sm font-medium text-gray-900">{formatCurrency(order.total)}</div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(order.orderStatus)}`}>
@@ -988,7 +995,7 @@ export default function Orders() {
                           <option value="" disabled>Select an item</option>
                           {menuItems.map(item => (
                             <option key={item.id} value={item.id}>
-                              {item.name} - ₦{item.price?.toLocaleString()}
+                              {item.name} - {formatCurrency(item.price)}
                             </option>
                           ))}
                         </select>
@@ -1026,7 +1033,7 @@ export default function Orders() {
                               <div>
                                 <div className="font-medium text-own-2">{item.name}</div>
                                 <div className="text-sm text-gray-500">
-                                  ₦{item.price?.toLocaleString()} × {item.quantity} = ₦{item.total?.toLocaleString()}
+                                  {formatCurrency(item.price)} × {item.quantity} = {formatCurrency(item.total)}
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
@@ -1059,7 +1066,7 @@ export default function Orders() {
                     <div className="space-y-2">
                       <div className="flex justify-between text-black">
                         <span>Subtotal:</span>
-                        <span>₦{orderForm.subtotal.toLocaleString()}</span>
+                        <span>{formatCurrency(orderForm.subtotal)}</span>
                       </div>
                       
                       <div className="flex justify-between text-black">
@@ -1080,7 +1087,7 @@ export default function Orders() {
                       
                       <div className="flex justify-between text-black">
                         <span>Tax (7.5%):</span>
-                        <span>₦{orderForm.tax.toFixed(2)}</span>
+                        <span>{formatCurrency(orderForm.tax)}</span>
                       </div>
                       
                       <div className="flex justify-between text-black">
@@ -1102,7 +1109,7 @@ export default function Orders() {
                       <div className="border-t border-gray-300 pt-2 mt-2 text-black">
                         <div className="flex justify-between font-bold text-lg">
                           <span>Total:</span>
-                          <span className="text-own-2">₦{orderForm.total.toFixed(2)}</span>
+                          <span className="text-own-2">{formatCurrency(orderForm.total)}</span>
                         </div>
                       </div>
                     </div>
@@ -1286,9 +1293,9 @@ export default function Orders() {
                                     <div className="text-xs text-gray-500">Note: {item.notes}</div>
                                   )}
                                 </td>
-                                <td className="py-3 px-4">₦{item.price?.toLocaleString()}</td>
+                                <td className="py-3 px-4">{formatCurrency(item.price)}</td>
                                 <td className="py-3 px-4">{item.quantity}</td>
-                                <td className="py-3 px-4 font-medium">₦{item.total?.toLocaleString()}</td>
+                                <td className="py-3 px-4 font-medium">{formatCurrency(item.total)}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -1304,30 +1311,30 @@ export default function Orders() {
                       <div className="space-y-2">
                         <div className="flex justify-between">
                           <span>Subtotal:</span>
-                          <span>₦{selectedOrder.subtotal?.toLocaleString()}</span>
+                          <span>{formatCurrency(selectedOrder.subtotal)}</span>
                         </div>
                         {selectedOrder.deliveryFee > 0 && (
                           <div className="flex justify-between">
                             <span>Delivery Fee:</span>
-                          <span>₦{selectedOrder.deliveryFee?.toLocaleString()}</span>
+                          <span>{formatCurrency(selectedOrder.deliveryFee)}</span>
                           </div>
                         )}
                         {selectedOrder.tax > 0 && (
                           <div className="flex justify-between">
                             <span>Tax:</span>
-                            <span>₦{selectedOrder.tax?.toFixed(2)}</span>
+                            <span>{formatCurrency(selectedOrder.tax)}</span>
                           </div>
                         )}
                         {selectedOrder.discount > 0 && (
                           <div className="flex justify-between">
                             <span>Discount:</span>
-                            <span>-₦{selectedOrder.discount?.toLocaleString()}</span>
+                            <span>-{formatCurrency(selectedOrder.discount)}</span>
                           </div>
                         )}
                         <div className="border-t border-gray-300 pt-2 mt-2">
                           <div className="flex justify-between font-bold text-lg">
                             <span>Total:</span>
-                            <span className="text-own-2">₦{selectedOrder.total?.toLocaleString()}</span>
+                            <span className="text-own-2">{formatCurrency(selectedOrder.total)}</span>
                           </div>
                         </div>
                       </div>
@@ -1374,17 +1381,17 @@ export default function Orders() {
                     <p className="text-gray-600">Order #{selectedOrder.orderNumber}</p>
                   </div>
                   <div className="text-right">
-                    <div className="text-lg font-bold text-own-2">AfriKitch Restaurant</div>
+                    <div className="text-lg font-bold text-own-2">Ada's Kitchen  Restaurant</div>
                     <div className="text-sm text-gray-600">123 Restaurant Street, Lagos</div>
                     <div className="text-sm text-gray-600">Phone: +234 123 456 7890</div>
-                    <div className="text-sm text-gray-600">Email: info@afrikitch.com</div>
+                    <div className="text-sm text-gray-600">Email: info@adaskitchen.com</div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-8 mb-8">
                   <div>
                     <h3 className="font-medium text-gray-700 mb-2">Bill To:</h3>
-                    <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className=" rounded-lg text-black">
                       <div className="font-medium">{selectedOrder.customerName}</div>
                       <div>{selectedOrder.customerPhone}</div>
                       <div>{selectedOrder.customerEmail}</div>
@@ -1399,7 +1406,7 @@ export default function Orders() {
                   
                   <div>
                     <h3 className="font-medium text-gray-700 mb-2">Invoice Details:</h3>
-                    <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="rounded-lg text-black">
                       <div className="flex justify-between mb-1">
                         <span>Invoice Date:</span>
                         <span>{new Date().toLocaleDateString()}</span>
@@ -1408,11 +1415,11 @@ export default function Orders() {
                         <span>Order Date:</span>
                         <span>{selectedOrder.createdAt?.toLocaleDateString()}</span>
                       </div>
-                      <div className="flex justify-between mb-1">
+                      <div className="flex justify-between mb-1 capitalize">
                         <span>Order Type:</span>
                         <span>{selectedOrder.orderType}</span>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between capitalize">
                         <span>Payment Method:</span>
                         <span>{selectedOrder.paymentMethod}</span>
                       </div>
@@ -1422,7 +1429,7 @@ export default function Orders() {
 
                 {/* Items Table */}
                 <div className="mb-8">
-                  <table className="w-full border-collapse">
+                  <table className="w-full border-collapse text-black">
                     <thead>
                       <tr className="bg-gray-100">
                         <th className="text-left py-3 px-4 font-medium text-gray-700 border">Description</th>
@@ -1435,9 +1442,9 @@ export default function Orders() {
                       {selectedOrder.items?.map((item, index) => (
                         <tr key={index}>
                           <td className="py-3 px-4 border">{item.name}</td>
-                          <td className="py-3 px-4 border">₦{item.price?.toLocaleString()}</td>
+                          <td className="py-3 px-4 border">{formatCurrency(item.price)}</td>
                           <td className="py-3 px-4 border">{item.quantity}</td>
-                          <td className="py-3 px-4 border">₦{item.total?.toLocaleString()}</td>
+                          <td className="py-3 px-4 border">{formatCurrency(item.total)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1445,44 +1452,44 @@ export default function Orders() {
                 </div>
 
                 {/* Summary */}
-                <div className="ml-auto w-64">
+                <div className="ml-auto w-64 text-black">
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span>Subtotal:</span>
-                      <span>₦{selectedOrder.subtotal?.toLocaleString()}</span>
+                      <span>{formatCurrency(selectedOrder.subtotal)}</span>
                     </div>
                     {selectedOrder.deliveryFee > 0 && (
                       <div className="flex justify-between">
                         <span>Delivery Fee:</span>
-                        <span>₦{selectedOrder.deliveryFee?.toLocaleString()}</span>
+                        <span>{formatCurrency(selectedOrder.deliveryFee)}</span>
                       </div>
                     )}
                     {selectedOrder.tax > 0 && (
                       <div className="flex justify-between">
                         <span>Tax (7.5%):</span>
-                        <span>₦{selectedOrder.tax?.toFixed(2)}</span>
+                        <span>{formatCurrency(selectedOrder.tax)}</span>
                       </div>
                     )}
                     {selectedOrder.discount > 0 && (
                       <div className="flex justify-between">
                         <span>Discount:</span>
-                        <span>-₦{selectedOrder.discount?.toLocaleString()}</span>
+                        <span>-{formatCurrency(selectedOrder.discount)}</span>
                       </div>
                     )}
                     <div className="border-t border-gray-300 pt-2 mt-2">
                       <div className="flex justify-between font-bold text-lg">
                         <span>Total:</span>
-                        <span className="text-own-2">₦{selectedOrder.total?.toLocaleString()}</span>
+                        <span className="text-own-2">{formatCurrency(selectedOrder.total)}</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Terms */}
-                <div className="mt-8 pt-8 border-t border-gray-200">
+                <div className="mt-8 pt-8 border-t border-gray-200 text-black">
                   <h4 className="font-medium text-gray-700 mb-2">Terms & Conditions</h4>
                   <p className="text-sm text-gray-600">
-                    Payment is due within 30 days. Late payments are subject to fees. All prices are in Nigerian Naira (₦).
+                    Payment is due within 30 days. Late payments are subject to fees. All prices are in Pounds (£).
                   </p>
                 </div>
 

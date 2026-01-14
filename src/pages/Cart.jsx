@@ -98,7 +98,7 @@ export default function Cart() {
   };
 
   const calculateTotal = () => {
-    return calculateSubtotal() + calculateDelivery();
+    return calculateSubtotal();
   };
 
   // Filter related dishes from Firebase data (only available ones)
@@ -389,11 +389,6 @@ export default function Cart() {
                     </div>
                   )}
                   
-                  <div className="flex justify-between">
-                    <span>Delivery Fee</span>
-                    <span>{calculateDelivery() === 0 ? 'FREE' : `£${(calculateDelivery()).toFixed(2)}`}</span>
-                  </div>
-                  
                   <div className="border-t border-gray-200 pt-3 mt-3">
                     <div className="flex justify-between text-lg font-bold">
                       <span>Total</span>
@@ -403,7 +398,6 @@ export default function Cart() {
                 </div>
 
                 <div className="text-sm text-gray-600 mb-6">
-                  <p>✓ Free delivery on orders over £200</p>
                   <p>✓ Orders prepared fresh daily</p>
                   {unavailableCartItems.length > 0 && (
                     <p className="text-red-600 mt-2">

@@ -1,11 +1,30 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { motion } from 'framer-motion';
 import { Link } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faTimes, faCreditCard, faWallet } from "@fortawesome/free-solid-svg-icons";
+import { 
+  faPlus, 
+  faTimes, 
+  faCreditCard, 
+  faWallet,
+  faTrash,
+  faCheck,
+  faExclamationCircle,
+  faRedo
+} from "@fortawesome/free-solid-svg-icons";
 import UserNavBar from "../components/UserNavbar";
 import UserSideBar from "../components/UserSidebar";
 import { useUserData } from "../hooks/useUserData";
+import { CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { 
+  doc, 
+  onSnapshot, 
+  updateDoc, 
+  arrayUnion, 
+  arrayRemove,
+  getDoc
+} from "firebase/firestore";
+import { db } from "../../firebaseConfig";
 
 export default function Payments() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -14,149 +33,343 @@ export default function Payments() {
     setIsSidebarOpen(prev => !prev);
   };
   const [activeTab, setActiveTab] = useState("Payments");
-  const [orderFilter, setOrderFilter] = useState("all");
-  const [expandedOrder, setExpandedOrder] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  const stripe = useStripe();
+  const elements = useElements();
+
+  const [savedCards, setSavedCards] = useState([]);
+  const [defaultCardId, setDefaultCardId] = useState(null);
   const [showAddMoneyModal, setShowAddMoneyModal] = useState(false);
   const [showAddPaymentModal, setShowAddPaymentModal] = useState(false);
   const [amount, setAmount] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState({
-    cardNumber: "",
-    expiryDate: "",
-    cvv: "",
-    cardholderName: ""
-  });
+  const [isSavingCard, setIsSavingCard] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [alert, setAlert] = useState(null);
   const [selectedAmount, setSelectedAmount] = useState(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
-  const { userData, loading: userLoading, updateUserData } = useUserData();
+  const { userData, loading: userLoading } = useUserData();
 
-  const paymentMethods = [
-    {
-      id: 1,
-      type: "card",
-      last4: "4242",
-      expiry: "12/25",
-      isDefault: true
+  // Function to refresh user data manually
+  const refreshUserData = async () => {
+    if (!userData?.uid) return;
+    
+    setIsRefreshing(true);
+    try {
+      const userRef = doc(db, "users", userData.uid);
+      const userSnap = await getDoc(userRef);
+      
+      if (userSnap.exists()) {
+        const data = userSnap.data();
+        setSavedCards(data.savedCards || []);
+        setDefaultCardId(data.defaultPaymentMethod || null);
+      }
+    } catch (error) {
+      console.error("Error refreshing user data:", error);
+    } finally {
+      setIsRefreshing(false);
     }
-  ];
+  };
 
-  // Predefined amounts for quick selection
-  const quickAmounts = [500, 1000, 2000, 5000, 10000]; // In pence
+  useEffect(() => {
+    if (!userData?.uid) return;
+
+    const userRef = doc(db, "users", userData.uid);
+
+    const unsubscribe = onSnapshot(userRef, (snapshot) => {
+      if (!snapshot.exists()) return;
+
+      const data = snapshot.data();
+      setSavedCards(data.savedCards || []);
+      setDefaultCardId(data.defaultPaymentMethod || null);
+    });
+
+    return () => unsubscribe();
+  }, [userData?.uid]);
+
+  // Predefined amounts for quick selection (in pence)
+  const quickAmounts = [500, 1000, 2000, 5000, 10000];
 
   // Format currency function
   const formatCurrency = (amount) => {
-    if (!amount && amount !== 0) return "£0.00";
-    return new Intl.NumberFormat('en-NG', {
+    if (amount === undefined || amount === null) return "£0.00";
+    
+    return new Intl.NumberFormat('en-GB', {
       style: 'currency',
       currency: 'GBP',
       minimumFractionDigits: 2
     }).format(amount / 100);
   };
 
-  // Handle add money
-  const handleAddMoney = () => {
+  // Handle add money (simulated)
+  const handleAddMoney = async () => {
     if (!amount || isNaN(amount) || Number(amount) <= 0) {
-      alert("Please enter a valid amount");
+      setAlert({
+        message: "Please enter a valid amount",
+        type: "error"
+      });
       return;
     }
 
-    const amountInPence = Math.round(Number(amount) * 100); // Convert to pence
-    const currentBalance = userData?.walletBalance || 0;
-    const newBalance = currentBalance + amountInPence;
+    try {
+      setIsProcessing(true);
 
-    // Update user data
-    updateUserData({ ...userData, walletBalance: newBalance });
-    
-    // Reset and close modal
-    setAmount("");
-    setSelectedAmount(null);
-    setShowAddMoneyModal(false);
-    
-    // In a real app, you would integrate with a payment gateway here
-    console.log(`Adding ${formatCurrency(amountInPence)} to wallet`);
-    
-    // Show success message
-    alert(`Successfully added ${formatCurrency(amountInPence)} to your wallet!`);
+      const amountInPence = Math.round(Number(amount) * 100);
+      const currentBalance = userData?.walletBalance || 0;
+      const newBalance = currentBalance + amountInPence;
+
+      // Update Firestore
+      const userRef = doc(db, "users", userData.uid);
+      await updateDoc(userRef, {
+        walletBalance: newBalance,
+        updatedAt: new Date().toISOString(),
+        walletTransactions: arrayUnion({
+          type: "deposit",
+          amount: amountInPence,
+          previousBalance: currentBalance,
+          newBalance: newBalance,
+          timestamp: new Date().toISOString(),
+          status: "completed",
+          description: "Wallet top-up"
+        })
+      });
+
+      // Refresh user data manually
+      await refreshUserData();
+
+      // Show success
+      setAlert({
+        message: `Successfully added ${formatCurrency(amountInPence)} to your wallet!`,
+        type: "success"
+      });
+
+      // Reset and close modal
+      setTimeout(() => {
+        setAmount("");
+        setSelectedAmount(null);
+        setShowAddMoneyModal(false);
+        setAlert(null);
+      }, 2000);
+
+    } catch (error) {
+      console.error("Error adding money:", error);
+      setAlert({
+        message: "Failed to add money. Please try again.",
+        type: "error"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   // Handle adding payment method
-  const handleAddPaymentMethod = () => {
-    // Validate card details
-    if (!paymentMethod.cardNumber || paymentMethod.cardNumber.length < 16) {
-      alert("Please enter a valid 16-digit card number");
-      return;
+  const handleAddPaymentMethod = async () => {
+    if (!stripe || !elements || isSavingCard) return;
+
+    setIsSavingCard(true);
+    setAlert(null);
+
+    try {
+      // 1. Create setup intent
+      const setupIntentResponse = await fetch(
+        `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/payments/create-setup-intent`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: userData.uid,
+            email: userData.email
+          })
+        }
+      );
+
+      if (!setupIntentResponse.ok) {
+        const errorData = await setupIntentResponse.json();
+        throw new Error(errorData.error || "Failed to create setup intent");
+      }
+
+      const { clientSecret } = await setupIntentResponse.json();
+
+      // 2. Confirm card setup
+      const { setupIntent, error } = await stripe.confirmCardSetup(
+        clientSecret,
+        {
+          payment_method: {
+            card: elements.getElement(CardElement),
+          },
+        }
+      );
+
+      if (error) throw error;
+
+      // 3. Get payment method details
+      const paymentMethodResponse = await fetch(
+        `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/payments/payment-method/${setupIntent.payment_method}`
+      );
+
+      if (!paymentMethodResponse.ok) {
+        throw new Error("Failed to retrieve payment method details");
+      }
+
+      const paymentMethod = await paymentMethodResponse.json();
+
+      // 4. Save card to Firestore
+      const userRef = doc(db, "users", userData.uid);
+      const cardData = {
+        id: paymentMethod.id,
+        brand: paymentMethod.card.brand,
+        last4: paymentMethod.card.last4,
+        expMonth: paymentMethod.card.exp_month,
+        expYear: paymentMethod.card.exp_year,
+        isDefault: savedCards.length === 0, // Set as default if first card
+        createdAt: new Date().toISOString()
+      };
+
+      await updateDoc(userRef, {
+        savedCards: arrayUnion(cardData),
+        ...(savedCards.length === 0 && { defaultPaymentMethod: paymentMethod.id }),
+        updatedAt: new Date().toISOString()
+      });
+
+      // 5. Refresh data manually
+      await refreshUserData();
+
+      setAlert({
+        message: "Card saved successfully!",
+        type: "success"
+      });
+
+      // Close modal after success
+      setTimeout(() => {
+        setShowAddPaymentModal(false);
+        setAlert(null);
+      }, 2000);
+
+    } catch (err) {
+      console.error("Error saving card:", err);
+      setAlert({
+        message: err.message || "Failed to save card. Please try again.",
+        type: "error"
+      });
+    } finally {
+      setIsSavingCard(false);
     }
-    if (!paymentMethod.expiryDate || !paymentMethod.expiryDate.includes("/")) {
-      alert("Please enter expiry date in MM/YY format");
-      return;
-    }
-    if (!paymentMethod.cvv || paymentMethod.cvv.length < 3) {
-      alert("Please enter a valid CVV");
-      return;
-    }
-    if (!paymentMethod.cardholderName) {
-      alert("Please enter cardholder name");
+  };
+
+  const handleSetDefault = async (paymentMethodId) => {
+    if (!userData?.stripeCustomerId) {
+      setAlert({
+        message: "Customer information not found. Please try again later.",
+        type: "error"
+      });
       return;
     }
 
-    // Extract last 4 digits
-    const last4 = paymentMethod.cardNumber.slice(-4);
-    const expiryParts = paymentMethod.expiryDate.split("/");
-    const expiry = `${expiryParts[0]}/${expiryParts[1]}`;
+    try {
+      // Update Stripe
+      const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:5000"}/payments/set-default-card`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerId: userData.stripeCustomerId,
+          paymentMethodId: paymentMethodId,
+          userId: userData.uid
+        })
+      });
 
-    // In a real app, you would:
-    // 1. Send to your backend
-    // 2. Backend would tokenize with payment processor
-    // 3. Store only the token and last 4 digits
+      if (!response.ok) {
+        throw new Error("Failed to update default card");
+      }
 
-    console.log("Adding payment method:", {
-      last4,
-      expiry,
-      cardholderName: paymentMethod.cardholderName
-    });
+      // Update Firestore
+      const userRef = doc(db, "users", userData.uid);
+      const updatedCards = savedCards.map((card) => ({
+        ...card,
+        isDefault: card.id === paymentMethodId
+      }));
 
-    // Reset form and close modal
-    setPaymentMethod({
-      cardNumber: "",
-      expiryDate: "",
-      cvv: "",
-      cardholderName: ""
-    });
-    setShowAddPaymentModal(false);
-    
-    // Show success message
-    alert("Payment method added successfully!");
+      await updateDoc(userRef, {
+        savedCards: updatedCards,
+        defaultPaymentMethod: paymentMethodId,
+        updatedAt: new Date().toISOString()
+      });
+
+      // Update local state
+      setDefaultCardId(paymentMethodId);
+      setSavedCards(updatedCards);
+
+      setAlert({
+        message: "Default card updated successfully!",
+        type: "success"
+      });
+
+      setTimeout(() => setAlert(null), 3000);
+
+    } catch (err) {
+      console.error("Error setting default card:", err);
+      setAlert({
+        message: err.message || "Failed to set default card",
+        type: "error"
+      });
+    }
+  };
+
+  const handleRemoveCard = async (paymentMethodId) => {
+    if (!window.confirm("Are you sure you want to remove this card?")) {
+      return;
+    }
+
+    try {
+      // Remove from Stripe
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/payments/card/${paymentMethodId}`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: userData.uid })
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to remove card");
+      }
+
+      // Update local state
+      const updatedCards = savedCards.filter(card => card.id !== paymentMethodId);
+      setSavedCards(updatedCards);
+
+      // If removed card was default, set a new default or clear
+      if (paymentMethodId === defaultCardId) {
+        const newDefaultCard = updatedCards.length > 0 ? updatedCards[0].id : null;
+        setDefaultCardId(newDefaultCard);
+
+        // Update Firestore
+        const userRef = doc(db, "users", userData.uid);
+        await updateDoc(userRef, {
+          defaultPaymentMethod: newDefaultCard,
+          updatedAt: new Date().toISOString()
+        });
+      }
+
+      setAlert({
+        message: "Card removed successfully!",
+        type: "success"
+      });
+
+      setTimeout(() => setAlert(null), 3000);
+
+    } catch (err) {
+      console.error("Error removing card:", err);
+      setAlert({
+        message: err.message || "Failed to remove card",
+        type: "error"
+      });
+    }
   };
 
   // Handle quick amount selection
   const handleQuickAmountSelect = (amount) => {
     setAmount((amount / 100).toString());
     setSelectedAmount(amount);
-  };
-
-  // Format card number with spaces
-  const formatCardNumber = (value) => {
-    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-    const matches = v.match(/\d{4,16}/g);
-    const match = matches && matches[0] || '';
-    const parts = [];
-    for (let i = 0, len = match.length; i < len; i += 4) {
-      parts.push(match.substring(i, i + 4));
-    }
-    if (parts.length) {
-      return parts.join(' ');
-    } else {
-      return value;
-    }
-  };
-
-  // Format expiry date
-  const formatExpiryDate = (value) => {
-    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-    if (v.length >= 2) {
-      return v.slice(0, 2) + (v.length > 2 ? '/' + v.slice(2, 4) : '');
-    }
-    return v;
   };
 
   // Loading state
@@ -188,6 +401,30 @@ export default function Payments() {
         setActiveTab={setActiveTab} 
         activeTab={activeTab}
       />
+      
+      {/* Alert Banner */}
+      {alert && (
+        <div className={`fixed top-20 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-md ${
+          alert.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'
+        } border rounded-lg p-4 shadow-lg`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <FontAwesomeIcon 
+                icon={alert.type === 'success' ? faCheck : faExclamationCircle} 
+                className={`mr-2 ${alert.type === 'success' ? 'text-green-500' : 'text-red-500'}`}
+              />
+              <span>{alert.message}</span>
+            </div>
+            <button 
+              onClick={() => setAlert(null)}
+              className="ml-4 text-gray-400 hover:text-gray-600"
+            >
+              <FontAwesomeIcon icon={faTimes} />
+            </button>
+          </div>
+        </div>
+      )}
+      
       <div className="md:flex md:justify-end">
         <div className={`pt-32 px-5 ${isSidebarOpen ? "md:w-[70%] lg:w-[75%]" : "md:w-full"} transition-all duration-500`}>
           <div className="max-w-7xl mx-auto pb-12 sm:px-6 lg:px-8">
@@ -197,11 +434,29 @@ export default function Payments() {
                 
                 {/* Payments & Wallet Tab */}
                 {activeTab === "Payments" && (
-                  <div className="bg-white rounded-2xl shadow-lg p-6">
-                    <h3 className="text-xl font-bold text-own-2 mb-6">Payments & Wallet</h3>
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-white rounded-2xl shadow-lg p-6"
+                  >
+                    <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-xl font-bold text-own-2">Payments & Wallet</h3>
+                      <button
+                        onClick={refreshUserData}
+                        disabled={isRefreshing}
+                        className="text-own-2 hover:text-amber-600 transition-colors"
+                        title="Refresh data"
+                      >
+                        <FontAwesomeIcon 
+                          icon={faRedo} 
+                          className={isRefreshing ? "animate-spin" : ""}
+                        />
+                      </button>
+                    </div>
+                    
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {/* Wallet Balance */}
-                      <div className="p-6 bg-own-2 rounded-xl text-white">
+                      <div className="p-6 bg-gradient-to-r from-own-2 to-amber-500 rounded-xl text-white">
                         <h4 className="text-lg font-semibold mb-2">Wallet Balance</h4>
                         <p className="text-3xl font-bold mb-4">
                           {formatCurrency(userData?.walletBalance || 0)}
@@ -212,34 +467,107 @@ export default function Payments() {
                         >
                           Add Money
                         </button>
+                        <p className="text-sm mt-4 opacity-90">
+                          Use your wallet balance for faster checkout
+                        </p>
                       </div>
 
                       {/* Payment Methods */}
                       <div className="p-6 border border-gray-200 rounded-xl text-black">
-                        <h4 className="text-lg font-semibold mb-4">Payment Methods</h4>
-                        {paymentMethods.map((method) => (
-                          <div key={method.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg mb-2">
-                            <div>
-                              <p className="font-semibold">Card ending in {method.last4}</p>
-                              <p className="text-sm text-gray-600">Expires {method.expiry}</p>
-                            </div>
-                            {method.isDefault && (
-                              <span className="bg-own-2 text-white text-xs px-2 py-1 rounded-full">Default</span>
-                            )}
+                        <div className="flex justify-between items-center mb-4">
+                          <h4 className="text-lg font-semibold">Payment Methods</h4>
+                          <span className="text-sm text-gray-500">
+                            {savedCards.length} saved
+                          </span>
+                        </div>
+                        
+                        {savedCards.length === 0 ? (
+                          <div className="text-center py-8">
+                            <FontAwesomeIcon icon={faCreditCard} className="text-4xl text-gray-300 mb-3" />
+                            <p className="text-gray-500">No saved cards</p>
+                            <p className="text-sm text-gray-400 mt-1">
+                              Add a card for faster checkout
+                            </p>
                           </div>
-                        ))}
+                        ) : (
+                          <div className="space-y-3">
+                            {savedCards.map((card) => (
+                              <div
+                                key={card.id}
+                                className="flex justify-between items-center p-3 border rounded-lg hover:bg-gray-50 transition-colors"
+                              >
+                                <div className="flex items-center">
+                                  <div className={`w-10 h-6 rounded mr-3 flex items-center justify-center ${
+                                    card.brand === 'visa' ? 'bg-blue-500' :
+                                    card.brand === 'mastercard' ? 'bg-red-500' :
+                                    card.brand === 'amex' ? 'bg-green-500' :
+                                    'bg-gray-500'
+                                  }`}>
+                                    <span className="text-xs text-white font-bold">
+                                      {card.brand === 'visa' ? 'VISA' :
+                                       card.brand === 'mastercard' ? 'MC' :
+                                       card.brand === 'amex' ? 'AMEX' : 'CARD'}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <p className="font-semibold">
+                                      •••• {card.last4}
+                                    </p>
+                                    <p className="text-sm text-gray-500">
+                                      Expires {card.expMonth.toString().padStart(2, '0')}/{card.expYear.toString().slice(-2)}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  {card.id === defaultCardId ? (
+                                    <span className="text-xs bg-green-600 text-white px-2 py-1 rounded">
+                                      Default
+                                    </span>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleSetDefault(card.id)}
+                                      className="text-sm text-own-2 hover:text-amber-600"
+                                    >
+                                      Set Default
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => handleRemoveCard(card.id)}
+                                    className="text-gray-400 hover:text-red-500 ml-2"
+                                    title="Remove card"
+                                  >
+                                    <FontAwesomeIcon icon={faTrash} />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
                         <button 
                           onClick={() => setShowAddPaymentModal(true)}
-                          className="w-full mt-4 py-2 border-2 border-dashed border-own-2 text-own-2 rounded-lg hover:bg-amber-50 transition-colors"
+                          className="w-full mt-4 py-3 border-2 border-dashed border-own-2 text-own-2 rounded-lg hover:bg-amber-50 transition-colors flex items-center justify-center"
                         >
                           <FontAwesomeIcon icon={faPlus} className="mr-2" />
                           Add Payment Method
                         </button>
                       </div>
                     </div>
-                  </div>
+                    
+                    {/* Recent Transactions (Optional) */}
+                    <div className="mt-8">
+                      <h4 className="text-lg font-semibold mb-4">Recent Wallet Activity</h4>
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <p className="text-gray-500 text-center">
+                          {userData?.walletTransactions?.length > 0 
+                            ? `${userData.walletTransactions.length} transactions found` 
+                            : "No recent transactions"}
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
                 )}
-
               </div>
             </div>
           </div>
@@ -266,12 +594,22 @@ export default function Payments() {
                     setShowAddMoneyModal(false);
                     setAmount("");
                     setSelectedAmount(null);
+                    setAlert(null);
                   }}
                   className="text-gray-400 hover:text-gray-600"
+                  disabled={isProcessing}
                 >
                   <FontAwesomeIcon icon={faTimes} />
                 </button>
               </div>
+
+              {alert && (
+                <div className={`mb-4 p-3 rounded-lg ${
+                  alert.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                }`}>
+                  {alert.message}
+                </div>
+              )}
 
               <div className="mb-6">
                 <label className="block text-gray-700 mb-2">Amount (£)</label>
@@ -279,14 +617,19 @@ export default function Payments() {
                   type="number"
                   step="0.01"
                   min="0"
+                  max="1000"
                   value={amount}
                   onChange={(e) => {
                     setAmount(e.target.value);
                     setSelectedAmount(null);
                   }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-own-2 focus:border-transparent"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-own-2 focus:border-transparent"
                   placeholder="0.00"
+                  disabled={isProcessing}
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Maximum deposit: £1,000.00
+                </p>
               </div>
 
               <div className="mb-6">
@@ -296,11 +639,12 @@ export default function Payments() {
                     <button
                       key={amt}
                       onClick={() => handleQuickAmountSelect(amt)}
-                      className={`py-2 rounded-lg border ${
+                      disabled={isProcessing}
+                      className={`py-3 rounded-lg border transition-colors ${
                         selectedAmount === amt 
                           ? 'bg-own-2 text-white border-own-2' 
                           : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                      }`}
+                      } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       {formatCurrency(amt)}
                     </button>
@@ -325,19 +669,32 @@ export default function Payments() {
                     setShowAddMoneyModal(false);
                     setAmount("");
                     setSelectedAmount(null);
+                    setAlert(null);
                   }}
-                  className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  disabled={isProcessing}
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleAddMoney}
-                  className="flex-1 py-3 bg-own-2 text-white rounded-lg hover:bg-own-1 transition-colors"
-                  disabled={!amount || Number(amount) <= 0}
+                  className="flex-1 py-3 bg-own-2 text-white rounded-lg hover:bg-amber-600 transition-colors flex items-center justify-center"
+                  disabled={!amount || Number(amount) <= 0 || isProcessing}
                 >
-                  Add Money
+                  {isProcessing ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                      Processing...
+                    </>
+                  ) : (
+                    'Add Money'
+                  )}
                 </button>
               </div>
+              
+              <p className="text-xs text-gray-500 text-center mt-4">
+                Note: This is a demonstration. In a real app, you would integrate with a payment gateway.
+              </p>
             </div>
           </motion.div>
         </div>
@@ -350,7 +707,7 @@ export default function Payments() {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            className="bg-white rounded-2xl shadow-xl w-full max-w-md"
+            className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto"
           >
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
@@ -361,96 +718,81 @@ export default function Payments() {
                 <button 
                   onClick={() => {
                     setShowAddPaymentModal(false);
-                    setPaymentMethod({
-                      cardNumber: "",
-                      expiryDate: "",
-                      cvv: "",
-                      cardholderName: ""
-                    });
+                    setAlert(null);
                   }}
                   className="text-gray-400 hover:text-gray-600"
+                  disabled={isSavingCard}
                 >
                   <FontAwesomeIcon icon={faTimes} />
                 </button>
               </div>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-gray-700 mb-2">Cardholder Name</label>
-                  <input
-                    type="text"
-                    value={paymentMethod.cardholderName}
-                    onChange={(e) => setPaymentMethod({...paymentMethod, cardholderName: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-own-2 focus:border-transparent"
-                    placeholder="John Doe"
+              {alert && (
+                <div className={`mb-4 p-3 rounded-lg ${
+                  alert.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                }`}>
+                  {alert.message}
+                </div>
+              )}
+
+              <div className="mb-6">
+                <p className="text-gray-700 mb-3">Card Details</p>
+                <div className="p-4 border border-gray-300 rounded-lg">
+                  <CardElement
+                    options={{
+                      style: {
+                        base: {
+                          fontSize: "16px",
+                          color: "#32325d",
+                          fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+                          "::placeholder": { color: "#a0aec0" },
+                        },
+                        invalid: {
+                          color: "#e53e3e",
+                        },
+                      },
+                    }}
                   />
                 </div>
-
-                <div>
-                  <label className="block text-gray-700 mb-2">Card Number</label>
-                  <input
-                    type="text"
-                    value={paymentMethod.cardNumber}
-                    onChange={(e) => setPaymentMethod({...paymentMethod, cardNumber: formatCardNumber(e.target.value)})}
-                    maxLength="19"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-own-2 focus:border-transparent"
-                    placeholder="1234 5678 9012 3456"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-gray-700 mb-2">Expiry Date</label>
-                    <input
-                      type="text"
-                      value={paymentMethod.expiryDate}
-                      onChange={(e) => setPaymentMethod({...paymentMethod, expiryDate: formatExpiryDate(e.target.value)})}
-                      maxLength="5"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-own-2 focus:border-transparent"
-                      placeholder="MM/YY"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-gray-700 mb-2">CVV</label>
-                    <input
-                      type="text"
-                      value={paymentMethod.cvv}
-                      onChange={(e) => setPaymentMethod({...paymentMethod, cvv: e.target.value.replace(/\D/g, '').slice(0, 4)})}
-                      maxLength="4"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-own-2 focus:border-transparent"
-                      placeholder="123"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-8 p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-600">
-                  <span className="font-bold">Note:</span> For demonstration purposes only. In a real application, 
-                  card details would be securely tokenized with a payment processor.
+                <p className="text-xs text-gray-500 mt-2">
+                  Your card details are securely processed by Stripe
                 </p>
               </div>
 
-              <div className="flex gap-3 mt-6">
+              <div className="p-4 bg-gray-50 rounded-lg mb-6">
+                <p className="text-sm text-gray-600">
+                  <span className="font-bold">Note:</span> This is a demonstration. In a real application, 
+                  card details are securely tokenized with Stripe and never touch our servers.
+                </p>
+                <p className="text-sm text-gray-600 mt-2">
+                  Test card: 4242 4242 4242 4242 | Exp: 12/34 | CVC: 123
+                </p>
+              </div>
+
+              <div className="flex gap-3">
                 <button
                   onClick={() => {
                     setShowAddPaymentModal(false);
-                    setPaymentMethod({
-                      cardNumber: "",
-                      expiryDate: "",
-                      cvv: "",
-                      cardholderName: ""
-                    });
+                    setAlert(null);
                   }}
-                  className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  disabled={isSavingCard}
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleAddPaymentMethod}
-                  className="flex-1 py-3 bg-own-2 text-white rounded-lg hover:bg-own-1 transition-colors"
+                  className="flex-1 py-3 bg-own-2 text-white rounded-lg hover:bg-amber-600 transition-colors flex items-center justify-center"
+                  disabled={!stripe || isSavingCard}
                 >
-                  Add Card
+                  {isSavingCard ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Card'
+                  )}
                 </button>
               </div>
             </div>

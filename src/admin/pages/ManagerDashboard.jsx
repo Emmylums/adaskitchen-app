@@ -16,7 +16,8 @@ import {
   faClipboardList,
   faTruck,
   faStar,
-  faFire
+  faFire,
+  faPoundSign
 } from '@fortawesome/free-solid-svg-icons';
 import { 
   collection, 
@@ -39,7 +40,7 @@ const DEFAULT_DATA = {
     {
       name: "Jollof Rice",
       description: "Traditional Nigerian rice cooked in tomato and pepper sauce",
-      price: 3000,
+      price: 30,
       category: "Main Course",
       imageUrl: "https://images.unsplash.com/photo-1603133872878-684f208fb84b?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80",
       isFeatured: true,
@@ -59,7 +60,7 @@ const DEFAULT_DATA = {
     {
       name: "Suya",
       description: "Spicy grilled meat skewers",
-      price: 2500,
+      price: 25,
       category: "Appetizer",
       imageUrl: "https://images.unsplash.com/photo-1546833999-b9f581a1996d?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80",
       isFeatured: true,
@@ -79,7 +80,7 @@ const DEFAULT_DATA = {
     {
       name: "Pounded Yam & Egusi",
       description: "Yam flour with melon seed soup",
-      price: 3500,
+      price: 35,
       category: "Main Course",
       imageUrl: "https://images.unsplash.com/photo-1565958011703-44f9829ba187?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80",
       isFeatured: false,
@@ -134,7 +135,7 @@ const DEFAULT_DATA = {
     {
       name: "Standard Package",
       description: "Perfect for small gatherings",
-      price: 25000,
+      price: 2500,
       minGuests: 10,
       maxGuests: 50,
       includes: ["Jollof Rice", "Fried Rice", "Chicken", "Salad", "Drinks"],
@@ -151,7 +152,7 @@ const DEFAULT_DATA = {
     {
       name: "Premium Package",
       description: "Ideal for corporate events",
-      price: 50000,
+      price: 5000,
       minGuests: 50,
       maxGuests: 200,
       includes: ["All Standard items", "Suya", "Small chops", "Dessert", "Premium drinks"],
@@ -254,8 +255,8 @@ const DEFAULT_DATA = {
       deliveryInstructions: "Call before arrival",
       orderType: "delivery",
       items: [
-        { name: "Jollof Rice", price: 3000, quantity: 2, total: 6000 },
-        { name: "Suya", price: 2500, quantity: 1, total: 2500 }
+        { name: "Jollof Rice", price: 30, quantity: 2, total: 60 },
+        { name: "Suya", price: 25, quantity: 1, total: 25 }
       ],
       subtotal: 8500,
       deliveryFee: 500,
@@ -280,8 +281,8 @@ const DEFAULT_DATA = {
       deliveryInstructions: "Leave at reception",
       orderType: "pickup",
       items: [
-        { name: "Pounded Yam & Egusi", price: 3500, quantity: 1, total: 3500 },
-        { name: "Fried Rice", price: 2800, quantity: 2, total: 5600 }
+        { name: "Pounded Yam & Egusi", price: 35, quantity: 1, total: 35 },
+        { name: "Fried Rice", price: 28, quantity: 2, total: 56 }
       ],
       subtotal: 9100,
       deliveryFee: 0,
@@ -309,8 +310,8 @@ const DEFAULT_DATA = {
       issueDate: new Date(),
       dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       items: [
-        { name: "Jollof Rice", price: 3000, quantity: 2, total: 6000 },
-        { name: "Suya", price: 2500, quantity: 1, total: 2500 }
+        { name: "Jollof Rice", price: 30, quantity: 2, total: 60},
+        { name: "Suya", price: 25, quantity: 1, total: 25 }
       ],
       subtotal: 8500,
       tax: 637.5,
@@ -672,6 +673,14 @@ export default function ManagerDashboard() {
     fetchDashboardData();
   }, []);
 
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: 'GBP',
+      minimumFractionDigits: 2
+    }).format(amount / 1);
+  };
+
   // Handle quick action clicks
   const handleQuickAction = (action) => {
     switch(action) {
@@ -786,9 +795,9 @@ export default function ManagerDashboard() {
                   </div>
 
                   <div className="bg-white p-4 rounded-2xl shadow-lg text-center">
-                    <FontAwesomeIcon icon={faDollarSign} className="text-2xl text-own-2 mb-2" />
+                    <p className="text-3xl text-own-2 mb-2 font-bold">£</p>
                     <h3 className="font-semibold text-gray-800 mb-1 text-sm">Revenue</h3>
-                    <p className="text-xl font-bold text-own-2">₦{stats.totalRevenue.toLocaleString()}</p>
+                    <p className="text-xl font-bold text-own-2">{formatCurrency(stats.totalRevenue)}</p>
                   </div>
 
                   <div className="bg-white p-4 rounded-2xl shadow-lg text-center">
@@ -840,7 +849,7 @@ export default function ManagerDashboard() {
                             <p className="text-xs text-gray-600">{order.customerName || 'Customer'}</p>
                           </div>
                           <div className="text-right">
-                            <p className="font-bold text-sm">₦{(order.total || 0).toLocaleString()}</p>
+                            <p className="font-bold text-sm">{(formatCurrency(order.total) || 0)}</p>
                             <span className={`px-2 py-1 rounded-full text-xs ${
                               order.orderStatus === 'completed' ? 'bg-green-100 text-green-800' : 
                               order.orderStatus === 'preparing' ? 'bg-yellow-100 text-yellow-800' : 
@@ -894,7 +903,7 @@ export default function ManagerDashboard() {
                               </span>
                             </div>
                             <p className="text-xs text-gray-600 mb-1">{dish.menuItemCategory}</p>
-                            <p className="text-xs font-bold">₦{(dish.menuItemPrice || 0).toLocaleString()}</p>
+                            <p className="text-xs font-bold">{(formatCurrency(dish.menuItemPrice) || 0)}</p>
                           </div>
                         </div>
                       ))}
@@ -966,7 +975,7 @@ export default function ManagerDashboard() {
                           <div key={item.id} className="flex items-center justify-between p-2 border-b border-gray-100">
                             <div>
                               <p className="font-medium text-gray-800 text-sm">{item.name}</p>
-                              <p className="text-xs text-gray-600">₦{item.price?.toLocaleString() || '0'}</p>
+                              <p className="text-xs text-gray-600">{formatCurrency(item.price) || '0'}</p>
                             </div>
                             <span className={`px-2 py-1 text-xs rounded-full ${
                               item.isFeatured ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'

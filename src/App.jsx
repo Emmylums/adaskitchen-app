@@ -38,6 +38,9 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import CompleteProfile from "./pages/CompleteProfile";
 import Checkout from "./users/pages/Checkout";
+import { Elements } from "@stripe/react-stripe-js";
+import { stripePromise } from "./stripe";
+
 
 
 function ScrollToTop() {
@@ -81,10 +84,25 @@ function App() {
         {/* Users Pages */}
         <Route path="/user/Dashboard" element={<Dashboard />} />
         <Route path="/user/Orders" element={<OrderHistory />} />
-        <Route path="/user/Payments" element={<Payments />} />
+        <Route
+          path="/user/Payments"
+          element={
+            <Elements stripe={stripePromise}>
+              <Payments />
+            </Elements>
+          }
+        />
         <Route path="/user/Menu" element={<UMenu />} />
         <Route path="/user/Cart" element={<UCart />} />
-        <Route path="/user/Checkout" element={<Checkout />} />
+        <Route
+          path="/user/Checkout"
+          element={
+            <Elements stripe={stripePromise}>
+              <Checkout />
+            </Elements>
+          }
+        />
+
         <Route path="/user/Notifications" element={<Notifications />} />
         <Route path="/user/Favorites" element={<Favorites />} />
         <Route path="/user/Addresses" element={<Addresses />} />
