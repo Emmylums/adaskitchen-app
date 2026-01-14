@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { motion } from 'framer-motion';
-import { Link } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { 
   faPlus, 
@@ -10,7 +9,11 @@ import {
   faTrash,
   faCheck,
   faExclamationCircle,
-  faRedo
+  faRedo,
+  faSave,
+  faHistory,
+  faLock,
+  faShieldAlt
 } from "@fortawesome/free-solid-svg-icons";
 import UserNavBar from "../components/UserNavbar";
 import UserSideBar from "../components/UserSidebar";
@@ -20,11 +23,11 @@ import {
   doc, 
   onSnapshot, 
   updateDoc, 
-  arrayUnion, 
-  arrayRemove,
+  arrayUnion,
   getDoc
 } from "firebase/firestore";
-import { db } from "../../firebaseConfig";
+import { db } from "../../firebaseConfig"; 
+import { createNotification, NotificationTemplates } from "../services/notificationService";
 
 export default function Payments() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -46,6 +49,14 @@ export default function Payments() {
   const [alert, setAlert] = useState(null);
   const [selectedAmount, setSelectedAmount] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
+  const [useNewCard, setUseNewCard] = useState(false);
+  const [saveNewCard, setSaveNewCard] = useState(false);
+  const [requiresConfirmation, setRequiresConfirmation] = useState(false);
+  const [clientSecret, setClientSecret] = useState(null);
+  const [paymentIntentId, setPaymentIntentId] = useState(null);
+  const [walletTransactions, setWalletTransactions] = useState([]);
+  const [showTransactions, setShowTransactions] = useState(false);
   
   const { userData, loading: userLoading } = useUserData();
 
@@ -62,6 +73,10 @@ export default function Payments() {
         const data = userSnap.data();
         setSavedCards(data.savedCards || []);
         setDefaultCardId(data.defaultPaymentMethod || null);
+        setWalletTransactions(data.walletTransactions || []);
+        if (data.savedCards?.length > 0) {
+          setSelectedPaymentMethod(data.defaultPaymentMethod || data.savedCards[0].id);
+        }
       }
     } catch (error) {
       console.error("Error refreshing user data:", error);
@@ -81,13 +96,17 @@ export default function Payments() {
       const data = snapshot.data();
       setSavedCards(data.savedCards || []);
       setDefaultCardId(data.defaultPaymentMethod || null);
+      setWalletTransactions(data.walletTransactions || []);
+      if (data.savedCards?.length > 0 && !selectedPaymentMethod) {
+        setSelectedPaymentMethod(data.defaultPaymentMethod || data.savedCards[0].id);
+      }
     });
 
     return () => unsubscribe();
   }, [userData?.uid]);
 
   // Predefined amounts for quick selection (in pence)
-  const quickAmounts = [500, 1000, 2000, 5000, 10000];
+  const quickAmounts = [500, 1000, 2000, 5000, 10000, 20000];
 
   // Format currency function
   const formatCurrency = (amount) => {
@@ -100,7 +119,19 @@ export default function Payments() {
     }).format(amount / 100);
   };
 
-  // Handle add money (simulated)
+  // Format date function
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // Handle add money with card payment
   const handleAddMoney = async () => {
     if (!amount || isNaN(amount) || Number(amount) <= 0) {
       setAlert({
@@ -110,50 +141,97 @@ export default function Payments() {
       return;
     }
 
+    const amountInPence = Math.round(Number(amount) * 100);
+    
+    // Check if using saved card or new card
+    if (!useNewCard && !selectedPaymentMethod && savedCards.length > 0) {
+      setAlert({
+        message: "Please select a payment method",
+        type: "error"
+      });
+      return;
+    }
+
+    if (useNewCard && !elements) {
+      setAlert({
+        message: "Please enter card details",
+        type: "error"
+      });
+      return;
+    }
+
     try {
       setIsProcessing(true);
+      setAlert(null);
 
-      const amountInPence = Math.round(Number(amount) * 100);
-      const currentBalance = userData?.walletBalance || 0;
-      const newBalance = currentBalance + amountInPence;
+      const requestBody = {
+        amount: amountInPence,
+        userId: userData.uid,
+        currency: "gbp"
+      };
 
-      // Update Firestore
-      const userRef = doc(db, "users", userData.uid);
-      await updateDoc(userRef, {
-        walletBalance: newBalance,
-        updatedAt: new Date().toISOString(),
-        walletTransactions: arrayUnion({
-          type: "deposit",
-          amount: amountInPence,
-          previousBalance: currentBalance,
-          newBalance: newBalance,
-          timestamp: new Date().toISOString(),
-          status: "completed",
-          description: "Wallet top-up"
-        })
-      });
+      if (useNewCard) {
+        // For new card, we'll handle confirmation separately
+        requestBody.saveCard = saveNewCard;
+      } else {
+        // For saved card
+        requestBody.paymentMethodId = selectedPaymentMethod;
+      }
 
-      // Refresh user data manually
-      await refreshUserData();
+      console.log("Sending wallet top-up request:", requestBody);
 
-      // Show success
-      setAlert({
-        message: `Successfully added ${formatCurrency(amountInPence)} to your wallet!`,
-        type: "success"
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/payments/add-money-to-wallet`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody)
+        }
+      );
 
-      // Reset and close modal
-      setTimeout(() => {
-        setAmount("");
-        setSelectedAmount(null);
-        setShowAddMoneyModal(false);
-        setAlert(null);
-      }, 2000);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Payment failed");
+      }
+
+      // If payment requires confirmation (new card), handle it
+      if (data.requiresConfirmation) {
+        setClientSecret(data.clientSecret);
+        setPaymentIntentId(data.paymentIntentId);
+        setRequiresConfirmation(true);
+        return;
+      }
+
+      // If payment succeeded
+      if (data.success) {
+        // Refresh user data manually
+        await refreshUserData();
+
+        // Show success
+        setAlert({
+          message: `Successfully added ${formatCurrency(amountInPence)} to your wallet!`,
+          type: "success"
+        });
+
+        // Reset and close modal
+        setTimeout(() => {
+          setAmount("");
+          setSelectedAmount(null);
+          setShowAddMoneyModal(false);
+          setAlert(null);
+          setRequiresConfirmation(false);
+          setClientSecret(null);
+          setPaymentIntentId(null);
+          setUseNewCard(false);
+          setSaveNewCard(false);
+        }, 2000);
+      }
 
     } catch (error) {
       console.error("Error adding money:", error);
       setAlert({
-        message: "Failed to add money. Please try again.",
+        message: error.message || "Failed to add money. Please try again.",
         type: "error"
       });
     } finally {
@@ -161,7 +239,56 @@ export default function Payments() {
     }
   };
 
-  // Handle adding payment method
+  // Handle 3D Secure confirmation for new cards
+  const handlePaymentConfirmation = async () => {
+    if (!stripe || !clientSecret) return;
+
+    try {
+      setIsProcessing(true);
+      
+      const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret);
+      
+      if (error) {
+        throw error;
+      }
+
+      if (paymentIntent.status === 'succeeded') {
+        // Refresh user data
+        await refreshUserData();
+
+        setAlert({
+          message: `Successfully added ${formatCurrency(paymentIntent.amount)} to your wallet!`,
+          type: "success"
+        });
+
+        // Reset and close modal
+        setTimeout(() => {
+          setAmount("");
+          setSelectedAmount(null);
+          setShowAddMoneyModal(false);
+          setAlert(null);
+          setRequiresConfirmation(false);
+          setClientSecret(null);
+          setPaymentIntentId(null);
+          setUseNewCard(false);
+          setSaveNewCard(false);
+          if (elements) {
+            elements.getElement(CardElement).clear();
+          }
+        }, 2000);
+      }
+    } catch (error) {
+      console.error("Payment confirmation error:", error);
+      setAlert({
+        message: error.message || "Payment failed. Please try again.",
+        type: "error"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Handle adding payment method (separate from wallet top-up)
   const handleAddPaymentMethod = async () => {
     if (!stripe || !elements || isSavingCard) return;
 
@@ -372,6 +499,16 @@ export default function Payments() {
     setSelectedAmount(amount);
   };
 
+  // Clear card form
+  const clearCardForm = () => {
+    if (elements) {
+      const cardElement = elements.getElement(CardElement);
+      if (cardElement) {
+        cardElement.clear();
+      }
+    }
+  };
+
   // Loading state
   if (userLoading) {
     return (
@@ -467,9 +604,10 @@ export default function Payments() {
                         >
                           Add Money
                         </button>
-                        <p className="text-sm mt-4 opacity-90">
-                          Use your wallet balance for faster checkout
-                        </p>
+                        <div className="flex items-center mt-4 text-sm opacity-90">
+                          <FontAwesomeIcon icon={faLock} className="mr-2" />
+                          <span>Secure payments with Stripe</span>
+                        </div>
                       </div>
 
                       {/* Payment Methods */}
@@ -490,7 +628,7 @@ export default function Payments() {
                             </p>
                           </div>
                         ) : (
-                          <div className="space-y-3">
+                          <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
                             {savedCards.map((card) => (
                               <div
                                 key={card.id}
@@ -555,15 +693,111 @@ export default function Payments() {
                       </div>
                     </div>
                     
-                    {/* Recent Transactions (Optional) */}
+                    {/* Recent Transactions */}
                     <div className="mt-8">
-                      <h4 className="text-lg font-semibold mb-4">Recent Wallet Activity</h4>
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <p className="text-gray-500 text-center">
-                          {userData?.walletTransactions?.length > 0 
-                            ? `${userData.walletTransactions.length} transactions found` 
-                            : "No recent transactions"}
-                        </p>
+                      <div className="flex justify-between items-center mb-4">
+                        <h4 className="text-lg font-semibold">Recent Wallet Activity</h4>
+                        <button
+                          onClick={() => setShowTransactions(!showTransactions)}
+                          className="text-own-2 hover:text-amber-600 flex items-center"
+                        >
+                          <FontAwesomeIcon icon={faHistory} className="mr-2" />
+                          {showTransactions ? 'Hide' : 'Show'} Transactions
+                        </button>
+                      </div>
+                      
+                      {showTransactions ? (
+                        walletTransactions.length > 0 ? (
+                          <div className="bg-gray-50 rounded-lg overflow-hidden">
+                            <div className="overflow-x-auto">
+                              <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-100">
+                                  <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      Date
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      Type
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      Amount
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      Status
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      Description
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                  {walletTransactions.slice().reverse().map((transaction, index) => (
+                                    <tr key={index} className="hover:bg-gray-50">
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {formatDate(transaction.timestamp)}
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap">
+                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                          transaction.type === 'deposit' 
+                                            ? 'bg-green-100 text-green-800'
+                                            : 'bg-red-100 text-red-800'
+                                        }`}>
+                                          {transaction.type === 'deposit' ? 'Deposit' : 'Withdrawal'}
+                                        </span>
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-black">
+                                        {formatCurrency(transaction.amount)}
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap">
+                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                          transaction.status === 'completed' 
+                                            ? 'bg-green-100 text-green-800'
+                                            : transaction.status === 'pending'
+                                            ? 'bg-yellow-100 text-yellow-800'
+                                            : 'bg-red-100 text-red-800'
+                                        }`}>
+                                          {transaction.status}
+                                        </span>
+                                      </td>
+                                      <td className="px-6 py-4 text-sm text-gray-500">
+                                        {transaction.description}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="bg-gray-50 rounded-lg p-8 text-center">
+                            <FontAwesomeIcon icon={faHistory} className="text-4xl text-gray-300 mb-3" />
+                            <p className="text-gray-500">No transaction history yet</p>
+                            <p className="text-sm text-gray-400 mt-1">
+                              Start by adding money to your wallet
+                            </p>
+                          </div>
+                        )
+                      ) : (
+                        <div className="bg-gray-50 rounded-lg p-4">
+                          <p className="text-gray-500 text-center">
+                            {walletTransactions.length > 0 
+                              ? `${walletTransactions.length} transactions found` 
+                              : "No recent transactions"}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Security Note */}
+                    <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="flex items-start">
+                        <FontAwesomeIcon icon={faShieldAlt} className="text-blue-500 mr-3 mt-1" />
+                        <div>
+                          <h5 className="font-semibold text-blue-800">Secure Payment Processing</h5>
+                          <p className="text-sm text-blue-700 mt-1">
+                            Your payment information is encrypted and secure. We use Stripe, a PCI-DSS compliant payment processor, to ensure your card details are never stored on our servers.
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </motion.div>
@@ -581,7 +815,7 @@ export default function Payments() {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            className="bg-white rounded-2xl shadow-xl w-full max-w-md"
+            className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto"
           >
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
@@ -595,6 +829,12 @@ export default function Payments() {
                     setAmount("");
                     setSelectedAmount(null);
                     setAlert(null);
+                    setRequiresConfirmation(false);
+                    setClientSecret(null);
+                    setPaymentIntentId(null);
+                    setUseNewCard(false);
+                    setSaveNewCard(false);
+                    clearCardForm();
                   }}
                   className="text-gray-400 hover:text-gray-600"
                   disabled={isProcessing}
@@ -611,90 +851,193 @@ export default function Payments() {
                 </div>
               )}
 
-              <div className="mb-6">
-                <label className="block text-gray-700 mb-2">Amount (£)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="1000"
-                  value={amount}
-                  onChange={(e) => {
-                    setAmount(e.target.value);
-                    setSelectedAmount(null);
-                  }}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-own-2 focus:border-transparent"
-                  placeholder="0.00"
-                  disabled={isProcessing}
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Maximum deposit: £1,000.00
-                </p>
-              </div>
-
-              <div className="mb-6">
-                <p className="text-gray-700 mb-3">Quick Select</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {quickAmounts.map((amt) => (
-                    <button
-                      key={amt}
-                      onClick={() => handleQuickAmountSelect(amt)}
+              {!requiresConfirmation ? (
+                <>
+                  <div className="mb-6">
+                    <label className="block text-gray-700 mb-2">Amount (£)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.50"
+                      max="1000"
+                      value={amount}
+                      onChange={(e) => {
+                        setAmount(e.target.value);
+                        setSelectedAmount(null);
+                      }}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-own-2 focus:border-transparent text-black"
+                      placeholder="0.00"
                       disabled={isProcessing}
-                      className={`py-3 rounded-lg border transition-colors ${
-                        selectedAmount === amt 
-                          ? 'bg-own-2 text-white border-own-2' 
-                          : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                      } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Minimum: £0.50 | Maximum: £1,000.00
+                    </p>
+                  </div>
+
+                  <div className="mb-6">
+                    <p className="text-gray-700 mb-3">Quick Select</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {quickAmounts.map((amt) => (
+                        <button
+                          key={amt}
+                          onClick={() => handleQuickAmountSelect(amt)}
+                          disabled={isProcessing}
+                          className={`py-3 rounded-lg border transition-colors ${
+                            selectedAmount === amt 
+                              ? 'bg-own-2 text-white border-own-2' 
+                              : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                          } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          {formatCurrency(amt)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Payment Method Selection */}
+                  <div className="mb-6">
+                    <p className="text-gray-700 mb-3">Payment Method</p>
+                    
+                    {savedCards.length > 0 && (
+                      <div className="space-y-3 mb-4">
+                        {savedCards.map((card) => (
+                          <div
+                            key={card.id}
+                            className={`p-3 border rounded-lg cursor-pointer transition-all ${
+                              !useNewCard && selectedPaymentMethod === card.id
+                                ? 'border-own-2 bg-own-2/5'
+                                : 'border-gray-300 hover:bg-gray-50'
+                            }`}
+                            onClick={() => {
+                              setUseNewCard(false);
+                              setSelectedPaymentMethod(card.id);
+                            }}
+                          >
+                            <div className="flex items-center justify-between text-black">
+                              <div className="flex items-center">
+                                <div className={`w-10 h-6 rounded mr-3 flex items-center justify-center ${
+                                  card.brand === 'visa' ? 'bg-blue-500' :
+                                  card.brand === 'mastercard' ? 'bg-red-500' :
+                                  card.brand === 'amex' ? 'bg-green-500' :
+                                  'bg-gray-500'
+                                }`}>
+                                  <span className="text-xs text-white font-bold">
+                                    {card.brand === 'visa' ? 'VISA' :
+                                     card.brand === 'mastercard' ? 'MC' :
+                                     card.brand === 'amex' ? 'AMEX' : 'CARD'}
+                                  </span>
+                                </div>
+                                <div>
+                                  <p className="font-semibold">
+                                    •••• {card.last4}
+                                  </p>
+                                  <p className="text-sm text-gray-500">
+                                    Expires {card.expMonth.toString().padStart(2, '0')}/{card.expYear.toString().slice(-2)}
+                                  </p>
+                                </div>
+                              </div>
+                              {!useNewCard && selectedPaymentMethod === card.id && (
+                                <FontAwesomeIcon icon={faCheck} className="text-own-2" />
+                              )}
+                            </div>
+                            {card.id === defaultCardId && (
+                              <span className="inline-block mt-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                                Default
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mb-6 p-4 bg-amber-50 rounded-lg text-black">
+                    <p className="font-semibold text-own-2 mb-1">Current Balance</p>
+                    <p className="text-2xl font-bold">{formatCurrency(userData?.walletBalance || 0)}</p>
+                    <p className="text-sm text-gray-600 mt-2">
+                      New balance after adding {amount ? formatCurrency(Number(amount) * 100) : "£0.00"}:{" "}
+                      <span className="font-bold">
+                        {formatCurrency((userData?.walletBalance || 0) + (Number(amount) * 100 || 0))}
+                      </span>
+                    </p>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        setShowAddMoneyModal(false);
+                        setAmount("");
+                        setSelectedAmount(null);
+                        setAlert(null);
+                        setUseNewCard(false);
+                        setSaveNewCard(false);
+                        clearCardForm();
+                      }}
+                      className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                      disabled={isProcessing}
                     >
-                      {formatCurrency(amt)}
+                      Cancel
                     </button>
-                  ))}
+                    <button
+                      onClick={handleAddMoney}
+                      className="flex-1 py-3 bg-own-2 text-white rounded-lg hover:bg-amber-600 transition-colors flex items-center justify-center"
+                      disabled={!amount || Number(amount) <= 0 || isProcessing || 
+                               (!useNewCard && !selectedPaymentMethod && savedCards.length > 0)}
+                    >
+                      {isProcessing ? (
+                        <>
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                          Processing...
+                        </>
+                      ) : (
+                        `Add ${amount ? formatCurrency(Number(amount) * 100) : 'Money'}`
+                      )}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                /* 3D Secure Confirmation */
+                <div className="text-center py-8">
+                  <div className="mb-6">
+                    <FontAwesomeIcon icon={faCreditCard} className="text-4xl text-own-2 mb-4" />
+                    <h4 className="text-xl font-bold mb-2">Confirm Payment</h4>
+                    <p className="text-gray-600 mb-4">
+                      Please confirm the payment of {formatCurrency(Number(amount) * 100)} to add to your wallet.
+                    </p>
+                    <p className="text-sm text-gray-500 mb-6">
+                      This might require additional verification from your bank.
+                    </p>
+                  </div>
+                  
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        setRequiresConfirmation(false);
+                        setClientSecret(null);
+                        setPaymentIntentId(null);
+                      }}
+                      className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                      disabled={isProcessing}
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={handlePaymentConfirmation}
+                      className="flex-1 py-3 bg-own-2 text-white rounded-lg hover:bg-amber-600 transition-colors flex items-center justify-center"
+                      disabled={isProcessing}
+                    >
+                      {isProcessing ? (
+                        <>
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                          Confirming...
+                        </>
+                      ) : (
+                        'Confirm Payment'
+                      )}
+                    </button>
+                  </div>
                 </div>
-              </div>
-
-              <div className="mb-6 p-4 bg-amber-50 rounded-lg">
-                <p className="font-semibold text-own-2 mb-1">Current Balance</p>
-                <p className="text-2xl font-bold">{formatCurrency(userData?.walletBalance || 0)}</p>
-                <p className="text-sm text-gray-600 mt-2">
-                  New balance after adding {amount ? formatCurrency(Number(amount) * 100) : "£0.00"}:{" "}
-                  <span className="font-bold">
-                    {formatCurrency((userData?.walletBalance || 0) + (Number(amount) * 100 || 0))}
-                  </span>
-                </p>
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowAddMoneyModal(false);
-                    setAmount("");
-                    setSelectedAmount(null);
-                    setAlert(null);
-                  }}
-                  className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                  disabled={isProcessing}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAddMoney}
-                  className="flex-1 py-3 bg-own-2 text-white rounded-lg hover:bg-amber-600 transition-colors flex items-center justify-center"
-                  disabled={!amount || Number(amount) <= 0 || isProcessing}
-                >
-                  {isProcessing ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                      Processing...
-                    </>
-                  ) : (
-                    'Add Money'
-                  )}
-                </button>
-              </div>
-              
-              <p className="text-xs text-gray-500 text-center mt-4">
-                Note: This is a demonstration. In a real app, you would integrate with a payment gateway.
-              </p>
+              )}
             </div>
           </motion.div>
         </div>
@@ -719,6 +1062,7 @@ export default function Payments() {
                   onClick={() => {
                     setShowAddPaymentModal(false);
                     setAlert(null);
+                    clearCardForm();
                   }}
                   className="text-gray-400 hover:text-gray-600"
                   disabled={isSavingCard}
@@ -765,7 +1109,7 @@ export default function Payments() {
                   card details are securely tokenized with Stripe and never touch our servers.
                 </p>
                 <p className="text-sm text-gray-600 mt-2">
-                  Test card: 4242 4242 4242 4242 | Exp: 12/34 | CVC: 123
+                  <span className="font-bold">Test card:</span> 4242 4242 4242 4242 | <span className="font-bold">Exp:</span> 12/34 | <span className="font-bold">CVC:</span> 123
                 </p>
               </div>
 
@@ -774,6 +1118,7 @@ export default function Payments() {
                   onClick={() => {
                     setShowAddPaymentModal(false);
                     setAlert(null);
+                    clearCardForm();
                   }}
                   className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                   disabled={isSavingCard}

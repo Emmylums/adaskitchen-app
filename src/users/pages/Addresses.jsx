@@ -17,6 +17,7 @@ import { useUserData } from "../hooks/useUserData";
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebaseConfig";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { createNotification, NotificationTemplates } from "../services/notificationService";
 
 export default function Addresses() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -155,11 +156,19 @@ export default function Addresses() {
       // Update local state
       setAddresses(updatedAddresses);
       
-      alert(`"${addressName}" has been deleted successfully.`);
+      // Create notification
+      await createNotification(user.uid, NotificationTemplates.ADDRESS_DELETED(addressName));
+      
+      // Show success message
+      setFormSuccess(`"${addressName}" has been deleted successfully.`);
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setFormSuccess(""), 3000);
       
     } catch (error) {
       console.error("Error deleting address:", error);
-      alert("Failed to delete address. Please try again.");
+      setFormError("Failed to delete address. Please try again.");
+      setTimeout(() => setFormError(""), 3000);
     }
   };
 
@@ -175,6 +184,9 @@ export default function Addresses() {
       const data = userDoc.data();
       const currentAddresses = data.addresses || [];
       
+      // Find the address being set as default
+      const newDefaultAddress = currentAddresses.find(addr => addr.id === addressId);
+      
       // Update all addresses: set the selected one as default, others as non-default
       const updatedAddresses = currentAddresses.map(addr => ({
         ...addr,
@@ -189,11 +201,22 @@ export default function Addresses() {
       // Update local state
       setAddresses(updatedAddresses);
       
-      alert("Default address updated successfully!");
+      // Create notification
+      if (newDefaultAddress) {
+        await createNotification(user.uid, 
+          NotificationTemplates.DEFAULT_ADDRESS_CHANGED(newDefaultAddress.name)
+        );
+      }
+      
+      setFormSuccess("Default address updated successfully!");
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setFormSuccess(""), 3000);
       
     } catch (error) {
       console.error("Error setting default address:", error);
-      alert("Failed to update default address. Please try again.");
+      setFormError("Failed to update default address. Please try again.");
+      setTimeout(() => setFormError(""), 3000);
     }
   };
 
@@ -382,7 +405,18 @@ export default function Addresses() {
           return a.name.localeCompare(b.name);
         }));
         
-        setFormSuccess(isEditing ? "Address updated successfully!" : "Address added successfully!");
+        // Create appropriate notification
+        if (isEditing) {
+          await createNotification(user.uid, 
+            NotificationTemplates.ADDRESS_UPDATED(formData.name)
+          );
+          setFormSuccess("Address updated successfully!");
+        } else {
+          await createNotification(user.uid, 
+            NotificationTemplates.ADDRESS_ADDED(formData.name)
+          );
+          setFormSuccess("Address added successfully!");
+        }
         
       } else {
         // If user document doesn't exist, create it with the new address
@@ -392,6 +426,11 @@ export default function Addresses() {
         
         // Update local state
         setAddresses([addressData]);
+        
+        // Create notification
+        await createNotification(user.uid, 
+          NotificationTemplates.ADDRESS_ADDED(formData.name)
+        );
         setFormSuccess("Address added successfully!");
       }
       
@@ -685,7 +724,7 @@ export default function Addresses() {
                     type="text"
                     value="United Kingdom"
                     disabled
-                    className="w-full px-4 py-3 text-black border border-gray-300 rounded-xl bg-gray-50 text-gray-600"
+                    className="w-full px-4 py-3 text-black border border-gray-300 rounded-xl bg-gray-50"
                   />
                 </div>
 
@@ -870,7 +909,7 @@ export default function Addresses() {
                       </p>
                       <button 
                         onClick={openAddModal}
-                        className="inline-block bg-own-2 text-white px-6 py-3 rounded-xl hover:bg-amber-600 transition-colors flex items-center mx-auto"
+                        className="bg-own-2 text-white px-6 py-3 rounded-xl hover:bg-amber-600 transition-colors flex items-center mx-auto"
                       >
                         <FontAwesomeIcon icon={faPlus} className="mr-2" />
                         Add Your First Address

@@ -34,6 +34,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebaseConfig";
 import { CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { createNotification, NotificationTemplates } from "../../services/notificationService";
 
 export default function Checkout() {
   // Move all hooks to the top level - NO CONDITIONAL HOOKS
@@ -350,6 +351,22 @@ export default function Checkout() {
           updatedAt: serverTimestamp()
         });
 
+        // Create order confirmation notification
+        await createNotification(userData.uid,
+          NotificationTemplates.ORDER_CONFIRMED(orderData.orderNumber, orderData.total)
+        );
+        
+        // Create wallet usage notification if wallet was used
+        if (walletAmount > 0) {
+          await createNotification(userData.uid,
+            NotificationTemplates.WALLET_USED(
+              walletAmount,
+              walletBalance - walletAmount,
+              orderData.orderNumber
+            )
+          );
+        }
+
         // Set order details and confirm
         setOrderDetails({
           ...orderData,
@@ -428,6 +445,21 @@ export default function Checkout() {
               paidAt: serverTimestamp(),
               updatedAt: serverTimestamp()
             });
+
+            // Create notifications
+            await createNotification(userData.uid,
+              NotificationTemplates.ORDER_CONFIRMED(orderData.orderNumber, orderData.total)
+            );
+            
+            if (walletAmount > 0) {
+              await createNotification(userData.uid,
+                NotificationTemplates.WALLET_USED(
+                  walletAmount,
+                  walletBalance - walletAmount,
+                  orderData.orderNumber
+                )
+              );
+            }
 
             setOrderDetails({
               ...orderData,
@@ -529,6 +561,27 @@ export default function Checkout() {
                 updatedAt: serverTimestamp()
               });
 
+              // Create order confirmation notification
+              await createNotification(userData.uid,
+                NotificationTemplates.ORDER_CONFIRMED(orderData.orderNumber, orderData.total)
+              );
+              
+              // Create payment success notification
+              await createNotification(userData.uid,
+                NotificationTemplates.PAYMENT_SUCCESS(orderData.total, "card")
+              );
+              
+              // Create wallet usage notification if wallet was used
+              if (walletAmount > 0) {
+                await createNotification(userData.uid,
+                  NotificationTemplates.WALLET_USED(
+                    walletAmount,
+                    walletBalance - walletAmount,
+                    orderData.orderNumber
+                  )
+                );
+              }
+
               setOrderDetails({
                 ...orderData,
                 id: orderId,
@@ -554,6 +607,13 @@ export default function Checkout() {
             updatedAt: serverTimestamp()
           });
           
+          // Create payment failure notification
+          await createNotification(userData.uid,
+            NotificationTemplates.PAYMENT_FAILED(
+              orderData.total,
+              paymentError.message || "Payment failed"
+            )
+          );
           
           throw paymentError;
         }

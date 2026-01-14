@@ -19,6 +19,7 @@ import {
   reauthenticateWithCredential,
   EmailAuthProvider 
 } from "firebase/auth";
+import { createNotification, NotificationTemplates } from "../services/notificationService";
 
 export default function Settings() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);

@@ -6,7 +6,7 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Error from "./pages/Error";
 import Dashboard from "./users/pages/Dashboard";
-import Signup from "./pages/Signup.Jsx";
+import Signup from "./pages/Signup";
 import OurStory from "./pages/OurStory";
 import Catering from "./pages/Catering";
 import ContactUs from "./pages/ContactUs";
@@ -24,7 +24,6 @@ import Favorites from "./users/pages/Favorites";
 import Addresses from "./users/pages/Addresses";
 import USettings from "./users/pages/Settings";
 import Support from "./users/pages/Help&Support";
-import Security from "./users/pages/Security";
 import AdminDashboard from "./admin/pages/AdminDashboard";
 import Testing from "./admin/pages/Testing";
 import MenuManagement from "./admin/pages/MenuManagement";
@@ -106,7 +105,6 @@ function App() {
         <Route path="/user/Notifications" element={<Notifications />} />
         <Route path="/user/Favorites" element={<Favorites />} />
         <Route path="/user/Addresses" element={<Addresses />} />
-        {/* <Route path="/user/Security" element={<Security />} /> */}
         <Route path="/user/Support" element={<Support />} />
         <Route path="/user/Settings" element={<USettings />} />
  
