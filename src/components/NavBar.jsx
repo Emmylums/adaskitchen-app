@@ -5,9 +5,12 @@ import { Link } from "react-router-dom";
 import {Element} from 'react-scroll';
 import { faBars } from "@fortawesome/free-solid-svg-icons";
 
+
+
 const NavBar = ({onToggleMobileNavBar, activeLink}) => {
 
     const [activeTab, setActiveTab] = useState(activeLink);
+    const cookingUrl = new URL('../assets/logo.png', import.meta.url).href;
     const [isSticky, setIsSticky] = useState(false);
     const [showBackground, setShowBackground] = useState(false);
     const hideTimerRef = useRef(null);
@@ -56,7 +59,7 @@ const NavBar = ({onToggleMobileNavBar, activeLink}) => {
             <Element name="top">
                 <header className={`select-none w-full flex justify-between items-center transition-all duration-100 ease-in z-40 lg:px-16 px-5 text-white ${isSticky ? `bg-black py-4 shadow-lg ${showBackground ? "fixed" : "absolute"}` : "bg-transparent py-7 landscape:py-4 landscape:lg:py-7 absolute"}`}>
                     <Link to="/" smooth="true" duration={700} className="flex sm:w-auto landscape:w-1/3 w-3/6 text-lg space-x-4 leading-tight text-left font-black items-center cursor-pointer">
-                        <img src={logo} alt="Original Logo" className="w-24 landscape:w-18 landscape:lg:w-30 "/>
+                        <img src={cookingUrl} alt="Original Logo" className="w-24 landscape:w-18 landscape:lg:w-30 "/>
                     </Link>
                     <div className="sm:hidden landscape:hidden">
                         <button className="text-white text-3xl" onClick={onToggleMobileNavBar}>
