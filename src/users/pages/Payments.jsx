@@ -132,120 +132,123 @@ export default function Payments() {
   };
 
   // Handle add money with card payment
-  const handleAddMoney = async () => {
-    if (!amount || isNaN(amount) || Number(amount) <= 0) {
-      setAlert({
-        message: "Please enter a valid amount",
-        type: "error"
-      });
-      return;
+  // Handle add money with card payment
+const handleAddMoney = async () => {
+  if (!amount || isNaN(amount) || Number(amount) <= 0) {
+    setAlert({
+      message: "Please enter a valid amount",
+      type: "error"
+    });
+    return;
+  }
+
+  const amountInPence = Math.round(Number(amount) * 100);
+  
+  // Check if using saved card or new card
+  if (!useNewCard && !selectedPaymentMethod && savedCards.length > 0) {
+    setAlert({
+      message: "Please select a payment method",
+      type: "error"
+    });
+    return;
+  }
+
+  if (useNewCard && !elements) {
+    setAlert({
+      message: "Please enter card details",
+      type: "error"
+    });
+    return;
+  }
+
+  try {
+    setIsProcessing(true);
+    setAlert(null);
+
+    const paymentIntentData = {
+      amount: amountInPence,
+      userId: userData.uid,
+      currency: "gbp",
+      saveCard: saveNewCard  // Include saveCard flag
+    };
+
+    if (!useNewCard && selectedPaymentMethod) {
+      // For saved card
+      paymentIntentData.paymentMethodId = selectedPaymentMethod;
+    } else if (useNewCard && elements) {
+      // For new card - we'll handle the payment method separately
+      // We don't include paymentMethodId here, Stripe will create one
     }
 
-    const amountInPence = Math.round(Number(amount) * 100);
+    console.log("Sending wallet top-up request:", paymentIntentData);
+
+    // CORRECTED: Use add-money-to-wallet endpoint for wallet top-ups
+    const response = await fetch(
+      `${import.meta.env.VITE_API_URL || "https://adaskitchen-backend.vercel.app/api"}/payments/add-money-to-wallet`,
+      {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify(paymentIntentData)
+      }
+    );
     
-    // Check if using saved card or new card
-    if (!useNewCard && !selectedPaymentMethod && savedCards.length > 0) {
-      setAlert({
-        message: "Please select a payment method",
-        type: "error"
-      });
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Payment failed");
+    }
+
+    // If payment requires confirmation (new card), handle it
+    if (data.requiresConfirmation) {
+      setClientSecret(data.clientSecret);
+      setPaymentIntentId(data.paymentIntentId);
+      setRequiresConfirmation(true);
       return;
     }
 
-    if (useNewCard && !elements) {
-      setAlert({
-        message: "Please enter card details",
-        type: "error"
-      });
-      return;
-    }
+    // If payment succeeded
+    if (data.success) {
+      // Refresh user data manually
+      await refreshUserData();
 
-    try {
-      setIsProcessing(true);
-      setAlert(null);
-
-      const paymentIntentData = {
-        amount: amountInPence,
-        userId: userData.uid,
-        currency: "gbp"
-      };
-
-      if (useNewCard) {
-        // For new card, we'll handle confirmation separately
-        paymentIntentData.saveCard = saveNewCard;
-      } else {
-        // For saved card
-        paymentIntentData.paymentMethodId = selectedPaymentMethod;
-      }
-
-      console.log("Sending wallet top-up request:", paymentIntentData);
-
-      // Update the payment intent creation call:
-      const paymentIntentResponse = await fetch(
-        `${import.meta.env.VITE_API_URL || "https://adaskitchen-backend.vercel.app/api"}/payments/create-payment-intent`,
-        {
-          method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-          },
-          body: JSON.stringify(paymentIntentData)
-        }
+      // Create wallet top-up notification
+      await createNotification(userData.uid,
+        NotificationTemplates.WALLET_TOPUP(amountInPence, (userData?.walletBalance || 0) + amountInPence)
       );
-      const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || "Payment failed");
-      }
-
-      // If payment requires confirmation (new card), handle it
-      if (data.requiresConfirmation) {
-        setClientSecret(data.clientSecret);
-        setPaymentIntentId(data.paymentIntentId);
-        setRequiresConfirmation(true);
-        return;
-      }
-
-      // If payment succeeded
-      if (data.success) {
-        // Refresh user data manually
-        await refreshUserData();
-
-        // Create wallet top-up notification
-        await createNotification(userData.uid,
-          NotificationTemplates.WALLET_TOPUP(amountInPence, (userData?.walletBalance || 0) + amountInPence)
-        );
-
-        // Show success
-        setAlert({
-          message: `Successfully added ${formatCurrency(amountInPence)} to your wallet!`,
-          type: "success"
-        });
-
-        // Reset and close modal
-        setTimeout(() => {
-          setAmount("");
-          setSelectedAmount(null);
-          setShowAddMoneyModal(false);
-          setAlert(null);
-          setRequiresConfirmation(false);
-          setClientSecret(null);
-          setPaymentIntentId(null);
-          setUseNewCard(false);
-          setSaveNewCard(false);
-        }, 2000);
-      }
-
-    } catch (error) {
-      console.error("Error adding money:", error);
+      // Show success
       setAlert({
-        message: error.message || "Failed to add money. Please try again.",
-        type: "error"
+        message: `Successfully added ${formatCurrency(amountInPence)} to your wallet!`,
+        type: "success"
       });
-    } finally {
-      setIsProcessing(false);
+
+      // Reset and close modal
+      setTimeout(() => {
+        setAmount("");
+        setSelectedAmount(null);
+        setShowAddMoneyModal(false);
+        setAlert(null);
+        setRequiresConfirmation(false);
+        setClientSecret(null);
+        setPaymentIntentId(null);
+        setUseNewCard(false);
+        setSaveNewCard(false);
+      }, 2000);
     }
-  };
+
+  } catch (error) {
+    console.error("Error adding money:", error);
+    setAlert({
+      message: error.message || "Failed to add money. Please try again.",
+      type: "error"
+    });
+  } finally {
+    setIsProcessing(false);
+  }
+};
 
   // Handle 3D Secure confirmation for new cards
   const handlePaymentConfirmation = async () => {
