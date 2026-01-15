@@ -24,8 +24,8 @@ import Favorites from "./users/pages/Favorites";
 import Addresses from "./users/pages/Addresses";
 import USettings from "./users/pages/Settings";
 import Support from "./users/pages/Help&Support";
-import AdminDashboard from "./admin/pages/AdminDashboard";
-import Testing from "./admin/pages/Testing";
+
+
 import MenuManagement from "./admin/pages/MenuManagement";
 import Categories from "./admin/pages/Categories";
 import Gallery from "./admin/pages/Gallery";
@@ -119,9 +119,6 @@ function App() {
         <Route path="/admin/Orders" element={<Orders />} />
         <Route path="/admin/Invoices" element={<Invoices />} />
         <Route path="/admin/settings" element={<Settings />} />
-        
-        <Route path="/admin/test" element={<AdminDashboard />} />
-        <Route path="/admin/testing" element={<Testing />} />
 
 
         <Route path="*" element={<Error statusCode={404} message="Page Not Found" />} />
