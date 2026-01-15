@@ -164,7 +164,7 @@ export default function Payments() {
       setIsProcessing(true);
       setAlert(null);
 
-      const requestBody = {
+      const paymentIntentData = {
         amount: amountInPence,
         userId: userData.uid,
         currency: "gbp"
@@ -172,13 +172,13 @@ export default function Payments() {
 
       if (useNewCard) {
         // For new card, we'll handle confirmation separately
-        requestBody.saveCard = saveNewCard;
+        paymentIntentData.saveCard = saveNewCard;
       } else {
         // For saved card
-        requestBody.paymentMethodId = selectedPaymentMethod;
+        paymentIntentData.paymentMethodId = selectedPaymentMethod;
       }
 
-      console.log("Sending wallet top-up request:", requestBody);
+      console.log("Sending wallet top-up request:", paymentIntentData);
 
       // Update the payment intent creation call:
       const paymentIntentResponse = await fetch(

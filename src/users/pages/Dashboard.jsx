@@ -166,11 +166,7 @@ export default function Dashboard() {
             const isPaid = orderData.paymentStatus === 'paid' || 
                           orderData.paymentStatus === 'completed' ||
                           orderData.orderStatus === 'delivered' ||
-                          orderData.orderStatus === 'completed' ||
-                          (orderData.paymentMethod && 
-                           (orderData.paymentMethod === 'wallet' || 
-                            orderData.paymentMethod === 'card' || 
-                            orderData.paymentMethod === 'paypal'));
+                          orderData.orderStatus === 'completed';
             
             // Only add to total spent if order is paid
             if (isPaid && orderData.total) {
