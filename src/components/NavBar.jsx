@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import logo from '/logo.png';
+import logo from '../assets/logo.png';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Link } from "react-router-dom";
 import {Element} from 'react-scroll';
