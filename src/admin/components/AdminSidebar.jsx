@@ -157,7 +157,7 @@ const AdminSideBar = ({ isOpen, closeSidebar, activeTab, setActiveTab }) => {
     { id: "Menu", icon: faUtensils, label: "Menu Management", path: "/admin/menu" },
     { id: "Categories", icon: faTags, label: "Categories", path: "/admin/categories" },
     { id: "Gallery", icon: faImages, label: "Gallery", path: "/admin/gallery" },
-    { id: "Catering", icon: faBox, label: "Catering Packages", path: "/admin/catering" },
+    // { id: "Catering", icon: faBox, label: "Catering Packages", path: "/admin/catering" },
     { id: "Orders", icon: faShoppingCart, label: "Orders", path: "/admin/orders" },
     { id: "Invoices", icon: faFileInvoice, label: "Invoices", path: "/admin/invoices" },
   ];
