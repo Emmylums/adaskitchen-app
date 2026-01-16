@@ -516,7 +516,7 @@ export default function Login() {
                 <div className="relative flex items-center justify-center h-full">
                     <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1.0 }}>
                         <div className="p-10 text-center text-white mt-10">
-                            <h2 className="font-display tracking-widest font-black text-4xl drop-shadow-lg">Welcome Back</h2>
+                            <h2 className="font-display tracking-widest font-black text-4xl drop-shadow-lg text-nowrap">Welcome Back</h2>
                             <p className="text-lg mt-2">Sign in to your Ada's Kitchen account</p>
                         </div>
                     </motion.div>
