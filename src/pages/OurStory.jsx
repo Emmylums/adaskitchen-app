@@ -5,6 +5,7 @@ import cooking from "../assets/cooking.png";
 import { motion } from 'framer-motion';
 import { Link } from "react-router-dom";
 import Footer from "../components/Footer";
+import bg from "../assets/background4.jpg";
 import { db } from "../firebaseConfig";
 import { collection, getDocs, query } from "firebase/firestore";
 
@@ -218,7 +219,7 @@ export default function OurStory() {
             <MobileNavBar isVisible={mobileNavBarVisible} activeLink="Our Story" onClose={() => setMobileNavBarVisible(false)} className="md:col-span-1 pt-7"/>
             
             {/* Hero Section */}
-            <section className="relative bg-[url(./assets/background.jpeg)] h-[50vh] bg-center bg-cover">
+            <section style={{ backgroundImage: `url(${bg})` }} className="relative bg-[url(./assets/background.jpeg)] h-[50vh] bg-center bg-cover">
                 <div className="absolute inset-0 h-[50vh] opacity-70 bg-black" />
                 <div className="relative flex items-center justify-center h-full">
                     <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1.0 }}>
