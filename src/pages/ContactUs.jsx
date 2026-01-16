@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import NavBar from "../components/NavBar";
 import MobileNavBar from "../components/MobileNavBar";
+import bg from "../assets/background.jpeg";
 import { motion } from 'framer-motion';
 import Footer from "../components/Footer";
 
@@ -11,7 +12,7 @@ export default function ContactUs() {
     <>
       <NavBar activeLink="Contact Us" onToggleMobileNavBar={() => setMobileNavBarVisible(!mobileNavBarVisible)} />
       <MobileNavBar isVisible={mobileNavBarVisible} activeLink="Contact Us" onClose={() => setMobileNavBarVisible(false)} className="md:col-span-1 pt-7"/>
-        <section className="relative bg-[url(./assets/background4.jpg)] h-[50vh] bg-center bg-cover">
+        <section style={{ backgroundImage: `url(${bg})` }}  className="relative h-[50vh] bg-center bg-cover">
             <div className="absolute inset-0 h-[50vh] opacity-70 bg-black" />
             <div className="relative flex items-center justify-center h-full">
                 <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1.0 }}>

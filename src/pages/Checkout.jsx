@@ -4,7 +4,8 @@ import MobileNavBar from "../components/MobileNavBar";
 import { motion } from "framer-motion";
 import { useCart } from "../context/CartContext";
 import AlertBanner from "../components/AlertBanner";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom"; 
+import bg from "../assets/background.jpeg";
 import Footer from "../components/Footer";
 
 export default function Checkout() {
@@ -56,7 +57,7 @@ export default function Checkout() {
       <NavBar activeLink="Checkout" onToggleMobileNavBar={() => setMobileNavBarVisible(!mobileNavBarVisible)} />
       <MobileNavBar isVisible={mobileNavBarVisible} activeLink="Checkout" onClose={() => setMobileNavBarVisible(false)} />
 
-      <section className="relative bg-[url(./assets/background4.jpg)] h-[50vh] bg-center bg-cover">
+      <section style={{ backgroundImage: `url(${bg})` }} className="relative bg-[url(./assets/background4.jpg)] h-[50vh] bg-center bg-cover">
         <div className="absolute inset-0 h-[50vh] opacity-70 bg-black" />
         <div className="relative flex items-center justify-center h-full">
           <motion.div

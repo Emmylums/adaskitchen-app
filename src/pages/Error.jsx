@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import bg from "../assets/background.jpeg";
 import NavBar from '../components/NavBar';
 import MobileNavBar from '../components/MobileNavBar';
 import Footer from '../components/Footer';
@@ -14,7 +15,7 @@ const Error = ({ statusCode = 500, message = "Something went wrong" }) => {
 
             <MobileNavBar isVisible={mobileNavBarVisible} activeLink="" onClose={() => setMobileNavBarVisible(false)} className="md:col-span-1 pt-7"/>
 
-            <div className="flex flex-col items-center justify-center min-h-screen bg-[url(./assets/background6.jpg)] bg-center bg-cover px-4">
+            <div style={{ backgroundImage: `url(${bg})` }} className="flex flex-col items-center justify-center min-h-screen bg-center bg-cover px-4">
                 <div className="absolute inset-0 h-screen opacity-70 bg-black" />
                 <div className="relative flex flex-col items-center ">
 

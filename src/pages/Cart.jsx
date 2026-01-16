@@ -7,7 +7,8 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCartShopping, faPlus, faTrashCan, faArrowLeft, faBan, faExclamationTriangle } from "@fortawesome/free-solid-svg-icons";
 import AlertBanner from "../components/AlertBanner";
 import { Link } from "react-router-dom";
-import Footer from "../components/Footer.jsx";
+import Footer from "../components/Footer.jsx"; 
+import bg from "../assets/background.jpeg";
 // Firebase imports
 import { getDocs, collection } from "firebase/firestore";
 import { db } from "../firebaseConfig"; // Adjust this path
@@ -130,7 +131,7 @@ export default function Cart() {
       <MobileNavBar isVisible={mobileNavBarVisible} activeLink="Cart" onClose={() => setMobileNavBarVisible(false)} className="md:col-span-1 pt-7" />
 
       {/* Hero Section */}
-      <section className="relative bg-[url(./assets/background4.jpg)] h-[40vh] bg-center bg-cover">
+      <section style={{ backgroundImage: `url(${bg})` }} className="relative h-[40vh] bg-center bg-cover">
         <div className="absolute inset-0 h-[40vh] opacity-70 bg-black" />
         <div className="relative flex items-center justify-center h-full">
           <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1.0 }}>

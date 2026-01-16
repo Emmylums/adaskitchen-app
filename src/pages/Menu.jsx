@@ -6,7 +6,8 @@ import { motion, useInView } from 'framer-motion';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch, faShoppingCart, faPlus, faMinus, faFilter } from "@fortawesome/free-solid-svg-icons";
 import AlertBanner from "../components/AlertBanner";
-import { useCart } from "../context/CartContext";
+import { useCart } from "../context/CartContext"; 
+import bg from "../assets/background.jpeg";
 import Footer from "../components/Footer";
 import { db } from "../firebaseConfig";
 import { collection, getDocs, query } from "firebase/firestore";
@@ -371,7 +372,7 @@ export default function Menu() {
           </Link>
         </div>
 
-        <section className="relative bg-[url(./assets/background4.jpg)] h-[50vh] bg-center bg-cover">
+        <section style={{ backgroundImage: `url(${bg})` }} className="relative h-[50vh] bg-center bg-cover">
           <div className="absolute inset-0 h-[50vh] opacity-70 bg-black" />
           <div className="relative flex items-center justify-center h-full">
             <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1.0 }}>

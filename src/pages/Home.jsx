@@ -1,6 +1,7 @@
 import { useEffect, useState} from "react";
 import NavBar from "../components/NavBar";
-import MobileNavBar from "../components/MobileNavBar";
+import MobileNavBar from "../components/MobileNavBar"; 
+import bg from "../assets/background.jpeg";
 import jollof from "../assets/jollof.jpeg";
 import boy from "../assets/boy.png";
 import girl from "../assets/girl.png";
@@ -395,7 +396,7 @@ export default function Home() {
             )}
             <div>
                 <main>
-                    <section className="relative bg-[url(./assets/background.jpeg)] h-screen bg-center bg-cover">
+                    <section style={{ backgroundImage: `url(${bg})` }}  className="relative h-screen bg-center bg-cover">
                         <div className="absolute inset-0 h-screen opacity-60 bg-black" />
                         <div className="relative flex items-center justify-center h-full">
                             <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1.0 }}>

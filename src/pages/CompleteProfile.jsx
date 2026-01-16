@@ -1,6 +1,7 @@
 // CompleteProfile.js
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import bg from "../assets/background.jpeg";
 import { useAuth } from "../context/AuthContext";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebaseConfig";
