@@ -16,8 +16,8 @@ const MobileNavBar = ({ isVisible, activeLink, onClose, className }) => {
       { name: "Home"},
       { name: "Our Story"},
       { name: "Menu"},
-      { name: "Catering"},
-      // { name: "Cart", icon: <FontAwesomeIcon icon={faShoppingCart} className="inline-block ml-2 text-xs" />},
+      // { name: "Catering"},
+      { name: "Cart", icon: <FontAwesomeIcon icon={faShoppingCart} className="inline-block ml-2 text-xs" />},
       { name: "Contact Us"},
       { name: "Login"},
   ];
