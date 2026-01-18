@@ -539,7 +539,7 @@ export default function Home() {
                     </section>
 
                     {/* Catering Services Section */}
-                    <section className="py-16 px-6 bg-gray-50">
+                    {/* <section className="py-16 px-6 bg-gray-50">
                         <div className="max-w-6xl mx-auto flex flex-col md:flex-row landscape:flex-row items-center gap-10">
                             <motion.div 
                                 initial={{ opacity: 0, x: -50 }}
@@ -594,7 +594,7 @@ export default function Home() {
                                 </Link>
                             </motion.div>
                         </div>
-                    </section>
+                    </section> */}
                     
                     <section className="py-10 px-4 sm:px-6">
                         <MotionWrapper direction="up">
