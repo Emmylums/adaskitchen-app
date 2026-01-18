@@ -21,7 +21,7 @@ function Footer(){
                         <h2 className="font-semibold pb-2 md:text-center md:text-xl">Contact / Support</h2>
                         <nav className="flex flex-col md:flex-row gap-5 md:text-xl">
                             <Link to="/Contact Us">Contact Us</Link>
-                            <a href="tel:+2349124354006">Phone</a>
+                            <a href="tel:+447737176235">Phone</a>
                             <a>
                                 <button className="hover:cursor-pointer">
                                     Whatsapp
@@ -37,11 +37,11 @@ function Footer(){
                             <p className="md:text-xl">Follow Us On Our Socials Below</p>
                         </div>
                         <div className="flex gap-7 text-2xl pt-4 items-center justify-center">
-                            <a href="https://www.facebook.com/share/1B7PCprqon/" target="_blank"><FontAwesomeIcon icon={faFacebook}></FontAwesomeIcon></a>
-                            <a href="https://www.instagram.com/grow_16withalerah?igsh=NmtzdXg5cGNuYnp2" target="_blank"><FontAwesomeIcon icon={faInstagram}></FontAwesomeIcon></a>
-                            <a href="https://www.linkedin.com/company/grow-with-alerah/" target="_blank"><FontAwesomeIcon icon={faLinkedin}></FontAwesomeIcon></a>
-                            <a href="https://www.tiktok.com/@elite_skillsbyalerah?_t=ZM-8uU2PuA5Lbr&_r=1" target="_blank"><FontAwesomeIcon icon={faTiktok}></FontAwesomeIcon></a>
-                            <a href="https://x.com/elite_skills16?t=wVngOvNz3YQjTIYmfI8HfA&s=09" target="_blank"><FontAwesomeIcon icon={faXTwitter}></FontAwesomeIcon></a>
+                            <a href="" target="_blank"><FontAwesomeIcon icon={faFacebook}></FontAwesomeIcon></a>
+                            <a href="" target="_blank"><FontAwesomeIcon icon={faInstagram}></FontAwesomeIcon></a>
+                            <a href="" target="_blank"><FontAwesomeIcon icon={faLinkedin}></FontAwesomeIcon></a>
+                            <a href="" target="_blank"><FontAwesomeIcon icon={faTiktok}></FontAwesomeIcon></a>
+                            <a href="" target="_blank"><FontAwesomeIcon icon={faXTwitter}></FontAwesomeIcon></a>
                         </div>
                     </section>
                     <section className="pt-12 flex items-center justify-center text-xs">
