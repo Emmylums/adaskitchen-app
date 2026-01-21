@@ -1,4 +1,11 @@
 User-agent: *
 Allow: /
 
+Disallow: /user/
+Disallow: /admin/
+Disallow: /cart
+Disallow: /complete-profile
+Disallow: /forgot-password
+Disallow: /reset-password
+
 Sitemap: https://www.adaskitchen.uk/sitemap.xml

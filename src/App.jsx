@@ -61,20 +61,19 @@ function App() {
       <ScrollToTopButton/>
       <Routes>
         <Route exact path="/" element={<Home/>}/>
-        <Route exact path="/Home" element={<Home/>}/>
-        <Route exact path="/Our Story" element={<OurStory/>}/>
-        <Route exact path="/Menu" element={<Menu/>}/>
-        {/* <Route exact path="/Catering" element={<Catering/>}/> */}
-        {/* <Route exact path="/Gallery" element={<Gallery/>}/> */}
-        <Route exact path="/Terms&Conditions" element={<TermsAndConditions/>}/>
-        <Route exact path="/Privacy Policy" element={<PrivacyPolicy/>}/>
-        <Route exact path="/Cart" element={<Cart/>}/>
-        <Route exact path="/Contact Us" element={<ContactUs/>}/>
-        <Route exact path="/Login" element={<Login/>}/>
-        <Route exact path="/Signup" element={<Signup/>}/>
+        <Route exact path="/our-story" element={<OurStory/>}/>
+        <Route exact path="/menu" element={<Menu/>}/>
+        {/* <Route exact path="/catering" element={<Catering/>}/> */}
+        {/* <Route exact path="/gallery" element={<Gallery/>}/> */}
+        <Route exact path="/terms-and-conditions" element={<TermsAndConditions/>}/>
+        <Route exact path="/privacy-policy" element={<PrivacyPolicy/>}/>
+        <Route exact path="/cart" element={<Cart/>}/>
+        <Route exact path="/contact-us" element={<ContactUs/>}/>
+        <Route exact path="/login" element={<Login/>}/>
+        <Route exact path="/signup" element={<Signup/>}/>
         <Route exact path="/complete-profile" element={<CompleteProfile/>}/>
-        <Route exact path="/Forgot-password" element={<ForgotPassword/>}/>
-        <Route exact path="/Reset-password" element={<ResetPassword/>}/>
+        <Route exact path="/forgot-password" element={<ForgotPassword/>}/>
+        <Route exact path="/reset-password" element={<ResetPassword/>}/>
         
 
 
