@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://adaskitchen.uk/sitemap.xml
+Sitemap: https://www.adaskitchen.uk/sitemap.xml
