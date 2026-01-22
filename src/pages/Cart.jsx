@@ -6,7 +6,7 @@ import { useCart } from "../context/CartContext";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCartShopping, faPlus, faTrashCan, faArrowLeft, faBan, faExclamationTriangle } from "@fortawesome/free-solid-svg-icons";
 import AlertBanner from "../components/AlertBanner";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Footer from "../components/Footer.jsx"; 
 import bg from "../assets/background.jpeg";
 // Firebase imports
@@ -15,11 +15,34 @@ import { db } from "../firebaseConfig"; // Adjust this path
 
 export default function Cart() {
   const [mobileNavBarVisible, setMobileNavBarVisible] = useState(false);
-  const { cart, getTotalQuantity, updateQuantity, removeFromCart, addToCart, clearCart } = useCart();
+  const { cart, getTotalQuantity, updateQuantity, removeFromCart, addToCart, clearCart, savePendingCart } = useCart();
   const [alert, setAlert] = useState(null);
   const [menuDishes, setMenuDishes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState(null); 
+
+  const navigate = useNavigate();
+
+
+  const handleCheckoutRedirect = () => {
+    if (availableCartItems.length === 0) return;
+    
+    // Save current cart as pending transfer using CartContext
+    const saveSuccess = savePendingCart(cart);
+    
+    if (saveSuccess) {
+      // Redirect to login with checkout as destination
+      // window.location.href = `/login?redirect=${encodeURIComponent('/user/checkout')}`;
+      // OR if using React Router navigate:
+      navigate(`/login?redirect=${encodeURIComponent('/user/checkout')}`);
+    } else {
+      setAlert({ 
+        message: 'Failed to save cart. Please try again.', 
+        type: 'error' 
+      });
+      setTimeout(() => setAlert(null), 3000);
+    }
+  };
 
   // Fetch dishes from Firebase menus collection
   useEffect(() => {
@@ -407,20 +430,19 @@ export default function Cart() {
                   )}
                 </div>
 
-                <Link to="/checkout">
-                  <button 
-                    className={`w-full py-4 font-bold rounded-xl transition-colors shadow-md ${
-                      availableCartItems.length > 0
-                        ? 'bg-own-2 text-white hover:bg-amber-600'
-                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    }`}
-                    disabled={availableCartItems.length === 0}
-                  >
-                    {availableCartItems.length > 0 
-                      ? 'Proceed to Checkout' 
-                      : 'Add available items to checkout'}
-                  </button>
-                </Link>
+                <button 
+                  onClick={() => handleCheckoutRedirect()}
+                  className={`w-full py-4 font-bold rounded-xl transition-colors shadow-md ${
+                    availableCartItems.length > 0
+                      ? 'bg-own-2 text-white hover:bg-amber-600'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }`}
+                  disabled={availableCartItems.length === 0}
+                >
+                  {availableCartItems.length > 0 
+                    ? 'Proceed to Checkout' 
+                    : 'Add available items to checkout'}
+                </button>
 
                 <Link to="/menu">
                   <button className="w-full py-3 border border-own-2 text-own-2 font-bold rounded-xl hover:bg-gray-50 transition-colors mt-3">

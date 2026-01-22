@@ -11,6 +11,7 @@ import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 
 import { doc, getDoc, updateDoc, setDoc, collection } from "firebase/firestore";
 import { auth, db } from "../firebaseConfig";
 import { faGoogle } from "@fortawesome/free-brands-svg-icons";
+import CartTransferHandler from "../components/CartTransferHandler";
 
 export default function Login() {
     const [mobileNavBarVisible, setMobileNavBarVisible] = useState(false);
@@ -143,6 +144,7 @@ export default function Login() {
             }
             
             localStorage.setItem("userData",userDoc.data);
+            // const urlParams = new URLSearchParams(window.location.search);
             // 8. Redirect based on role after a short delay
             setTimeout(() => {
                 navigate(redirectPath);
@@ -775,7 +777,7 @@ export default function Login() {
                     </div>
                 </div>
             </section>
-
+            <CartTransferHandler/>
             <Footer/>
         </>
     );
