@@ -58,7 +58,7 @@ export default function Gallery() {
       <div className="pb-20 text-center text-white">
         <h2 className="text-4xl font-bold mb-6">Like What You See?</h2>
         <p className="text-lg mb-8">Order online and taste the passion behind every dish.</p>
-        <Link to="/Menu">
+        <Link to="/menu">
           <button className="px-8 py-4 bg-own-2 font-semibold text-lg rounded-full shadow-lg hover:bg-gray-100 hover:text-own-2 transition">
               Order Online
           </button>

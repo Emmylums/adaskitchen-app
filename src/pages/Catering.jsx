@@ -290,7 +290,7 @@ export default function Catering() {
                 <h2 className="text-4xl font-bold mb-6">Ready to Plan Your Event?</h2>
                 <p className="text-lg mb-8">Contact us today for a personalized catering consultation and quote</p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                    <Link to="/ContactUs">
+                    <Link to="/contact-us">
                         <button className="px-8 py-4 bg-white text-own-2 font-semibold text-lg rounded-full shadow-lg hover:bg-gray-100 transition">
                             Contact Us
                         </button>

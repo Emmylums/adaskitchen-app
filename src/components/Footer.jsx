@@ -11,10 +11,10 @@ function Footer(){
                     <section className="z-30">
                         <h2 className="font-semibold pb-2 md:text-center md:text-xl">Quick Links</h2>
                         <nav className="flex flex-col md:flex-row gap-5 md:text-xl">
-                            <Link to="/Our Story">About Ada's Kitchen</Link>
-                            <Link to="/Contact Us">Contact Us</Link>
-                            <Link to="/Signup">Sign Up</Link>
-                            <Link to="/Login">Login</Link>
+                            <Link to="/our-story">About Ada's Kitchen</Link>
+                            <Link to="/contact-us">Contact Us</Link>
+                            <Link to="/signup">Sign Up</Link>
+                            <Link to="/login">Login</Link>
                         </nav>
                     </section>
                     <section className="z-30">
@@ -27,7 +27,7 @@ function Footer(){
                                     Whatsapp
                                 </button>
                             </a>
-                            <Link to="/Our Story#faq">FAQ</Link> {/* Changed this line */}
+                            <Link to="/our-story#faq">FAQ</Link> {/* Changed this line */}
                         </nav>
                     </section>
                 </section>

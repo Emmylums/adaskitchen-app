@@ -179,15 +179,13 @@ export default function SignUp() {
                 console.warn("Notification creation failed (continuing anyway):", notifError);
                 // Continue even if notification fails
             }
-
-            console.log(userData);
             setSuccess(true);
             console.log("✅ User account created successfully");
             
-            // 5. Show success message and redirect to login page after 3 seconds
+            // 5. Show success message and redirect to login page after a second
             setTimeout(() => {
                 navigate("/login");
-            }, 3000);
+            }, 1500);
 
         } catch (err) {
             console.error("❌ Signup error details:", {
@@ -599,11 +597,11 @@ export default function SignUp() {
                                         />
                                         <label htmlFor="acceptTerms" className="ml-2 block text-sm text-gray-700">
                                             I agree to the{" "}
-                                            <Link to="/Terms&Conditions" className="text-own-2 hover:text-amber-600">
+                                            <Link to="/terms-and-conditions" className="text-own-2 hover:text-amber-600">
                                                 Terms and Conditions
                                             </Link>{" "}
                                             and{" "}
-                                            <Link to="/Privacy Policy" className="text-own-2 hover:text-amber-600">
+                                            <Link to="/privacy-policy" className="text-own-2 hover:text-amber-600">
                                                 Privacy Policy
                                             </Link>
                                         </label>

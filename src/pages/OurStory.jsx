@@ -396,7 +396,7 @@ export default function OurStory() {
             <div className="py-10 bg-own-2 text-center text-white">
                 <h2 className="text-4xl font-bold mb-6">Be Part of Our Story</h2>
                 <p className="text-lg mb-8">Order online and taste the passion behind every dish.</p>
-                <Link to="/Menu">
+                <Link to="/menu">
                     <button className="px-8 py-4 bg-white text-own-2 font-semibold text-lg rounded-full shadow-lg hover:bg-gray-100 transition">
                         Order Online
                     </button>

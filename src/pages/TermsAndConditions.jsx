@@ -2,8 +2,7 @@ import React from "react";
 import NavBar from "../components/NavBar";
 import MobileNavBar from "../components/MobileNavBar";
 import { useState } from "react";
-import { motion } from 'framer-motion';
-import { Link } from "react-router-dom"; 
+import { motion } from 'framer-motion'; 
 import bg from "../assets/background.jpeg";
 import Footer from "../components/Footer";
 

@@ -13,13 +13,13 @@ const MobileNavBar = ({ isVisible, activeLink, onClose, className }) => {
   }
 
   const menuItems = [
-      { name: "Home"},
-      { name: "Our Story"},
-      { name: "Menu"},
-      // { name: "Catering"},
-      { name: "Cart", icon: <FontAwesomeIcon icon={faShoppingCart} className="inline-block ml-2 text-xs" />},
-      { name: "Contact Us"},
-      { name: "Login"},
+      { name: "Home", link: ""},
+      { name: "Our Story", link: "our-story"},
+      { name: "Menu", link: "menu"},
+      // { name: "Catering", link: "catering"},
+      { name: "Cart", link: "cart", icon: <FontAwesomeIcon icon={faShoppingCart} className="inline-block ml-2 text-xs" />},
+      { name: "Contact Us", link: "contact-us"},
+      { name: "Login", link: "login"},
   ];
 
   return (
@@ -41,7 +41,7 @@ const MobileNavBar = ({ isVisible, activeLink, onClose, className }) => {
         <ul>
           {menuItems.map((item) => (
             <li key={item.name} className="mb-2"> 
-              <Link to={`/${item.name}`}>
+              <Link to={`/${item.link}`}>
                 <button
                   onClick={action}
                   className={`w-full text-left py-2 px-4 rounded ${

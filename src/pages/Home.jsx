@@ -407,7 +407,7 @@ export default function Home() {
                                         <h4 className="pt-2 landscape:text-sm sm:text-xl sm:px-[15%] sm:pt-5 md:text-2xl landscape:lg:pt-7 landscape:lg:text-lg">Savor Authentic Nigerian Cuisine, Crafted with Love & Tradition</h4>
                                     </div>
 
-                                    <Link to="/Menu">
+                                    <Link to="/menu">
                                         <button className="bg-own-2 mt-14 text-black text-lg font-semibold p-4 tracking-wider landscape:tracking-normal rounded-md landscape:lg:mt-8 landscape:mt-4 landscape:px-3 landscape:py-3 sm:text-2xl  sm:p-6 landscape:text-lg landscape:p-3 sm:rounded-md md:text-3xl md:p-9 md:rounded-xl landscape:rounded-md landscape:lg:rounded-xl landscape:lg:text-2xl landscape:lg:p-5 landscape:lg:tracking-wider hover:cursor-pointer">Order Now</button>
                                     </Link>
                                 </div>
@@ -451,7 +451,7 @@ export default function Home() {
                             </div>
                         )}
                         
-                        <Link to="/Menu">
+                        <Link to="/menu">
                             <div className="py-8">
                                 <button className="bg-own-2 hover:bg-[oklch(85%_0.171_83.42)] text-[oklch(29.23%_0_0)] text-lg px-8 py-4 rounded-full flex items-center justify-center gap-3 tracking-wid shadow-lg hover:shadow-[oklch(79.58%_0.171_83.42)/40] transition-all duration-300 text-nowrap hover:cursor-pointer">
                                     Order Now <FontAwesomeIcon className="text-xs" icon={faArrowRight}/>
@@ -529,7 +529,7 @@ export default function Home() {
 
                                 Whether you're joining us for a comforting classic or an exciting new creation, we invite you to be part of Ada's Kitchen; where every meal is made with love.
                             </p>
-                            <Link to="/Our Story">
+                            <Link to="/our-story">
                                 <button className="bg-own-2 text-own-1 text-md md:text-xl px-6 py-4 rounded-md tracking-wide font-semibold">Learn More</button>
                             </Link>
                         </motion.div>
@@ -587,7 +587,7 @@ export default function Home() {
                                         <span className="text-[oklch(29.23%_0_0)] text-sm font-semibold md:text-base">Available 24/7</span>
                                     </li>
                                 </ul>
-                                <Link to="/Catering">
+                                <Link to="/catering">
                                     <button className="bg-[oklch(29.23%_0_0)] hover:bg-[oklch(40%_0.02_100)] text-[oklch(79.58%_0.171_83.42)] font-semibold px-8 py-3.5 rounded-lg transition-colors shadow-lg hover:shadow-[oklch(29.23%_0_0)/30] text-sm md:text-base">
                                         Contact us for Catering Options
                                     </button>
