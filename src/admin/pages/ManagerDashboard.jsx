@@ -678,7 +678,7 @@ export default function ManagerDashboard() {
       style: 'currency',
       currency: 'GBP',
       minimumFractionDigits: 2
-    }).format(amount / 1);
+    }).format(amount / 100);
   };
 
   // Handle quick action clicks
@@ -787,7 +787,7 @@ export default function ManagerDashboard() {
             ) : (
               <>
                 {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                   <div className="bg-white p-4 rounded-2xl shadow-lg text-center">
                     <FontAwesomeIcon icon={faShoppingCart} className="text-2xl text-own-2 mb-2" />
                     <h3 className="font-semibold text-gray-800 mb-1 text-sm">Total Orders</h3>
@@ -812,11 +812,11 @@ export default function ManagerDashboard() {
                     <p className="text-xl font-bold text-own-2">{stats.totalFeaturedDishes}</p>
                   </div>
 
-                  <div className="bg-white p-4 rounded-2xl shadow-lg text-center">
+                  {/* <div className="bg-white p-4 rounded-2xl shadow-lg text-center">
                     <FontAwesomeIcon icon={faUsers} className="text-2xl text-own-2 mb-2" />
                     <h3 className="font-semibold text-gray-800 mb-1 text-sm">Catering Requests</h3>
                     <p className="text-xl font-bold text-own-2">{cateringRequests.length}</p>
-                  </div>
+                  </div> */}
 
                   <div className="bg-white p-4 rounded-2xl shadow-lg text-center">
                     <FontAwesomeIcon icon={faClipboardList} className="text-2xl text-own-2 mb-2" />
@@ -824,11 +824,11 @@ export default function ManagerDashboard() {
                     <p className="text-xl font-bold text-own-2">{stats.pendingOrders}</p>
                   </div>
 
-                  <div className="bg-white p-4 rounded-2xl shadow-lg text-center">
+                  {/* <div className="bg-white p-4 rounded-2xl shadow-lg text-center">
                     <FontAwesomeIcon icon={faCalendarAlt} className="text-2xl text-own-2 mb-2" />
                     <h3 className="font-semibold text-gray-800 mb-1 text-sm">Pending Catering</h3>
                     <p className="text-xl font-bold text-own-2">{stats.pendingCateringRequests}</p>
-                  </div>
+                  </div> */}
                 </div>
 
                 {/* Recent Activity */}
@@ -975,7 +975,7 @@ export default function ManagerDashboard() {
                           <div key={item.id} className="flex items-center justify-between p-2 border-b border-gray-100">
                             <div>
                               <p className="font-medium text-gray-800 text-sm">{item.name}</p>
-                              <p className="text-xs text-gray-600">{formatCurrency(item.price) || '0'}</p>
+                              <p className="text-xs text-gray-600">{formatCurrency(item.price*100) || '0'}</p>
                             </div>
                             <span className={`px-2 py-1 text-xs rounded-full ${
                               item.isFeatured ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'

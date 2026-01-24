@@ -7,6 +7,27 @@ import Footer from "../components/Footer";
 
 export default function ContactUs() {
   const [mobileNavBarVisible, setMobileNavBarVisible] = useState(false);
+  const [formData, setFormData] = useState({
+        name: "",
+        email: "",
+        message: "",
+    });
+    const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    const handleSubmit = (e) => {
+    e.preventDefault();
+
+    const subject = encodeURIComponent("Contact Form Submission");
+    const body = encodeURIComponent(
+        `Name: ${formData.name}\n\n\nMessage:\n${formData.message}`
+    );
+
+    const mailtoLink = `mailto:info@adaskitchen.uk?subject=${subject}&body=${body}`;
+
+    window.location.href = mailtoLink;
+    };
 
   return (
     <>
@@ -28,20 +49,20 @@ export default function ContactUs() {
         <div className="grid md:grid-cols-2 gap-16">
           <div>
             <h2 className="text-3xl font-bold text-own-2 mb-8">Get In Touch</h2>
-            <form>
+            <form onSubmit={handleSubmit}>
               <div className="mt-6 text-black">
                 <label className="block font-medium mb-2">Name</label>
-                <input type="text" className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-own-2 " placeholder="Your Name" />
+                <input type="text" className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-own-2 " placeholder="Your Name" value={formData.name} onChange={handleChange} id="name" name="name"/>
               </div>
 
               <div className="mt-6 text-black">
                 <label className="block font-medium mb-2">Email</label>
-                <input type="email" className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-own-2" placeholder="Your Email" />
+                <input type="email" className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-own-2" placeholder="Your Email" value={formData.email} onChange={handleChange} id="email" name="email"/>
               </div>
 
               <div className="mt-6 text-black">
                 <label className="block font-medium mb-2">Message</label>
-                <textarea rows="5" className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-own-2" placeholder="Your Message"></textarea>
+                <textarea rows="5" className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-own-2" placeholder="Your Message" value={formData.message} onChange={handleChange} id="message" name="message"></textarea>
               </div>
 
               <button type="submit" className="bg-own-2 text-white font-semibold px-8 py-4 rounded-full hover:bg-own-2/90 transition mt-7">

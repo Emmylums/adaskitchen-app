@@ -116,7 +116,7 @@ function App() {
         <Route path="/admin/Gallery" element={<Gallery />} />
         {/* <Route path="/admin/Catering" element={<ACatering />} /> */}
         <Route path="/admin/Orders" element={<Orders />} />
-        <Route path="/admin/Invoices" element={<Invoices />} />
+        {/* <Route path="/admin/Invoices" element={<Invoices />} /> */}
         <Route path="/admin/settings" element={<Settings />} />
 
 

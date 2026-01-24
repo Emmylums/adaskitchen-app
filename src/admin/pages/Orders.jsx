@@ -69,7 +69,7 @@ export default function Orders() {
       style: 'currency',
       currency: 'GBP',
       minimumFractionDigits: 2
-    }).format(amount / 1);
+    }).format(amount / 100);
   };
 
   // Mock user data
@@ -300,7 +300,7 @@ export default function Orders() {
       customerName: order.customerName || "",
       customerPhone: order.customerPhone || "",
       customerEmail: order.customerEmail || "",
-      deliveryAddress: order.deliveryAddress || "",
+      deliveryAddress: order.deliveryAddress.address || order.deliveryAddress || "",
       deliveryInstructions: order.deliveryInstructions || "",
       orderType: order.orderType || "delivery",
       paymentMethod: order.paymentMethod || "cash",
@@ -448,10 +448,10 @@ export default function Orders() {
   // Calculate order totals
   const calculateTotals = () => {
     const subtotal = orderForm.items.reduce((sum, item) => sum + (item.total || 0), 0);
-    const deliveryFee = parseFloat(orderForm.deliveryFee) || 0;
+    const deliveryFee = parseFloat(orderForm.deliveryFee);
     const tax = subtotal * 0.075; // 7.5% tax
-    const discount = parseFloat(orderForm.discount) || 0;
-    const total = subtotal + deliveryFee + tax - discount;
+    // const discount = parseFloat(orderForm.discount) || 0;
+    const total = subtotal + deliveryFee + tax;
     
     setOrderForm(prev => ({
       ...prev,
@@ -564,7 +564,7 @@ export default function Orders() {
   // Print invoice with database check
   const printInvoice = async () => {
     if (!selectedOrder) return;
-    
+    console.log(selectedOrder);
     try {
       // Check if invoice already exists
       const invoiceExists = await checkInvoiceExists(selectedOrder.id);
@@ -776,7 +776,7 @@ export default function Orders() {
                                   order.orderType === 'pickup' ? 'bg-green-100 text-green-800' :
                                   'bg-purple-100 text-purple-800'
                                 }`}>
-                                  {order.orderType}
+                                  {order.orderType || "delivery"}
                                 </span>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
@@ -995,7 +995,7 @@ export default function Orders() {
                           <option value="" disabled>Select an item</option>
                           {menuItems.map(item => (
                             <option key={item.id} value={item.id}>
-                              {item.name} - {formatCurrency(item.price)}
+                              {item.name} - {formatCurrency(item.price*100)}
                             </option>
                           ))}
                         </select>
@@ -1033,7 +1033,7 @@ export default function Orders() {
                               <div>
                                 <div className="font-medium text-own-2">{item.name}</div>
                                 <div className="text-sm text-gray-500">
-                                  {formatCurrency(item.price)} × {item.quantity} = {formatCurrency(item.total)}
+                                  {formatCurrency(item.price *100)} × {item.quantity} = {formatCurrency(item.total*100)}
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
@@ -1066,7 +1066,7 @@ export default function Orders() {
                     <div className="space-y-2">
                       <div className="flex justify-between text-black">
                         <span>Subtotal:</span>
-                        <span>{formatCurrency(orderForm.subtotal)}</span>
+                        <span>{formatCurrency(orderForm.subtotal*100)}</span>
                       </div>
                       
                       <div className="flex justify-between text-black">
@@ -1087,10 +1087,10 @@ export default function Orders() {
                       
                       <div className="flex justify-between text-black">
                         <span>Tax (7.5%):</span>
-                        <span>{formatCurrency(orderForm.tax)}</span>
+                        <span>{formatCurrency(orderForm.tax*100)}</span>
                       </div>
                       
-                      <div className="flex justify-between text-black">
+                      {/* <div className="flex justify-between text-black">
                         <span>Discount:</span>
                         <div className="flex items-center gap-2">
                           <input
@@ -1104,12 +1104,12 @@ export default function Orders() {
                             }}
                           />
                         </div>
-                      </div>
+                      </div> */}
                       
                       <div className="border-t border-gray-300 pt-2 mt-2 text-black">
                         <div className="flex justify-between font-bold text-lg">
                           <span>Total:</span>
-                          <span className="text-own-2">{formatCurrency(orderForm.total)}</span>
+                          <span className="text-own-2">{formatCurrency(orderForm.total*100)}</span>
                         </div>
                       </div>
                     </div>
@@ -1218,7 +1218,7 @@ export default function Orders() {
                             <FontAwesomeIcon icon={faMapMarkerAlt} className="text-own-2 mr-3 mt-1" />
                             <div>
                               <div className="font-medium">Delivery Address</div>
-                              <div className="text-sm">{selectedOrder.deliveryAddress}</div>
+                              <div className="text-sm">{selectedOrder.deliveryAddress || selectedOrder.deliveryAddress.address}</div>
                               {selectedOrder.deliveryInstructions && (
                                 <div className="text-xs text-gray-500 mt-1">
                                   Instructions: {selectedOrder.deliveryInstructions}
@@ -1398,7 +1398,7 @@ export default function Orders() {
                       {selectedOrder.deliveryAddress && (
                         <div className="mt-2">
                           <div className="text-sm font-medium">Delivery Address:</div>
-                          <div className="text-sm">{selectedOrder.deliveryAddress}</div>
+                          <div className="text-sm">{selectedOrder.deliveryAddress.address || selectedOrder.deliveryAddress}</div>
                         </div>
                       )}
                     </div>
@@ -1442,9 +1442,9 @@ export default function Orders() {
                       {selectedOrder.items?.map((item, index) => (
                         <tr key={index}>
                           <td className="py-3 px-4 border">{item.name}</td>
-                          <td className="py-3 px-4 border">{formatCurrency(item.price)}</td>
+                          <td className="py-3 px-4 border">{(formatCurrency(item.price))}</td>
                           <td className="py-3 px-4 border">{item.quantity}</td>
-                          <td className="py-3 px-4 border">{formatCurrency(item.total)}</td>
+                          <td className="py-3 px-4 border">{(formatCurrency(item.total))}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1493,7 +1493,7 @@ export default function Orders() {
                   </p>
                 </div>
 
-                <div className="flex gap-4 pt-8">
+                <div className="flex gap-4 pt-8 print:hidden">
                   <button
                     onClick={printInvoice}
                     className="flex-1 bg-own-2 text-white py-3 rounded-xl hover:bg-amber-600 transition-colors flex items-center justify-center gap-2"

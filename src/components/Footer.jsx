@@ -2,6 +2,7 @@ import { faFacebook, faInstagram, faLinkedin, faTiktok, faXTwitter } from "@fort
 import { faCopyright, faPalette } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Link } from "react-router-dom";
+import {sendWhatsAppMessage} from "../components/whatsappLink";
 
 function Footer(){
     return (
@@ -23,11 +24,11 @@ function Footer(){
                             <Link to="/Contact Us">Contact Us</Link>
                             <a href="tel:+447737176235">Phone</a>
                             <a>
-                                <button className="hover:cursor-pointer">
+                                <button className="hover:cursor-pointer" onClick={() => sendWhatsAppMessage("My name is ...................", "447737176235")}>
                                     Whatsapp
                                 </button>
                             </a>
-                            <Link to="/our-story#faq">FAQ</Link> {/* Changed this line */}
+                            {/* <Link to="/our-story#faq">FAQ</Link> Changed this line */}
                         </nav>
                     </section>
                 </section>
@@ -37,11 +38,9 @@ function Footer(){
                             <p className="md:text-xl">Follow Us On Our Socials Below</p>
                         </div>
                         <div className="flex gap-7 text-2xl pt-4 items-center justify-center">
-                            <a href="" target="_blank"><FontAwesomeIcon icon={faFacebook}></FontAwesomeIcon></a>
-                            <a href="" target="_blank"><FontAwesomeIcon icon={faInstagram}></FontAwesomeIcon></a>
-                            <a href="" target="_blank"><FontAwesomeIcon icon={faLinkedin}></FontAwesomeIcon></a>
-                            <a href="" target="_blank"><FontAwesomeIcon icon={faTiktok}></FontAwesomeIcon></a>
-                            <a href="" target="_blank"><FontAwesomeIcon icon={faXTwitter}></FontAwesomeIcon></a>
+                            <a href="https://www.facebook.com/share/164XsAbtot/?mibextid=wwXIfr" target="_blank"><FontAwesomeIcon icon={faFacebook}></FontAwesomeIcon></a>
+                            <a href="https://www.instagram.com/adaskitchen56?igsh=anhpMHFob29sM294&utm_source=qr" target="_blank"><FontAwesomeIcon icon={faInstagram}></FontAwesomeIcon></a>
+                            <a href="https://www.tiktok.com/@adaskitchen56?_r=1&_t=ZN-93JbvXrIsWU" target="_blank"><FontAwesomeIcon icon={faTiktok}></FontAwesomeIcon></a>
                         </div>
                     </section>
                     <section className="pt-12 flex items-center justify-center text-xs">
