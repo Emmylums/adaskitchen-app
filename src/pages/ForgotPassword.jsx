@@ -64,7 +64,10 @@ export default function ForgotPassword() {
             console.log("Redirect URL:", actionCodeSettings.url); // Debug log
             
             // Send password reset email with custom settings
-            await sendPasswordResetEmail(auth, email, actionCodeSettings);
+            await sendPasswordResetEmail(auth, email, {
+                url: "https://adaskitchen.uk/reset-password",
+                handleCodeInApp: true
+            });
             
             setEmailSent(true);
             setSuccess(`Password reset link sent to ${email}. Please check your inbox.`);
