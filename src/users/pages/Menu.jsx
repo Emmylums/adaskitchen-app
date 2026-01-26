@@ -236,7 +236,7 @@ export default function Menu() {
                     {/* Menu Items Grid */}
                     <div className="max-w-7xl mx-auto pt-4 pb-8">
                       {filteredItems.length > 0 ? (
-                        <div className={`grid gap-10 pt-10 ${isSidebarOpen ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-2" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"}`}>
+                        <div className={`grid gap-10 pt-10 ${isSidebarOpen ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-2 landscape:sm:grid-cols-2" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 landscape:sm:grid-cols-2 landscape:lg:grid-cols-3"}`}>
                           {filteredItems.map((item, index) => (
                             <MenuItemCard
                               key={item.id}

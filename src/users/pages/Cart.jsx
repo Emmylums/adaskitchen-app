@@ -181,7 +181,7 @@ export default function Cart() {
                       <div className="lg:col-span-2">
                         <div className="bg-white rounded-2xl shadow-lg p-6">
                           <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-2xl font-bold text-own-2">
+                            <h2 className="text-xl md:text-2xl font-bold text-own-2">
                               Your Order ({getTotalQuantity()} items)
                               {unavailableCartItems.length > 0 && (
                                 <span className="text-sm font-normal text-red-600 ml-2">
@@ -191,7 +191,7 @@ export default function Cart() {
                             </h2>
                             <button 
                               onClick={clearCart}
-                              className="text-red-500 hover:text-red-700 text-sm font-medium"
+                              className="text-red-500 hover:text-red-700 text-xs md:text-sm font-medium"
                             >
                               Clear Cart
                             </button>
@@ -279,7 +279,7 @@ export default function Cart() {
                                             −
                                           </button>
         
-                                          <span className="w-8 text-center font-semibold text-black">{item.quantity}</span>
+                                          <span className="w- text-center font-semibold text-black">{item.quantity}</span>
         
                                           <button
                                             onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
