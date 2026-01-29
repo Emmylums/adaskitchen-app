@@ -6,9 +6,23 @@ import { Link, useNavigate } from "react-router-dom";
 import Footer from "../components/Footer"; 
 import bg from "../assets/background.jpeg";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEye, faEyeSlash, faEnvelope, faLock, faExclamationCircle, faCheckCircle } from "@fortawesome/free-solid-svg-icons";
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { doc, getDoc, updateDoc, setDoc, collection } from "firebase/firestore";
+import { 
+  faEye, 
+  faEyeSlash, 
+  faEnvelope, 
+  faLock, 
+  faExclamationCircle, 
+  faCheckCircle,
+  faExclamationTriangle
+} from "@fortawesome/free-solid-svg-icons";
+import { 
+  signInWithEmailAndPassword, 
+  GoogleAuthProvider, 
+  signInWithPopup,
+  sendEmailVerification as firebaseSendEmailVerification,
+  signOut as firebaseSignOut
+} from "firebase/auth";
+import { doc, getDoc, updateDoc, setDoc } from "firebase/firestore";
 import { auth, db } from "../firebaseConfig";
 import { faGoogle } from "@fortawesome/free-brands-svg-icons";
 import CartTransferHandler from "../components/CartTransferHandler";
@@ -24,6 +38,8 @@ export default function Login() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
+    const [resendLoading, setResendLoading] = useState(false);
+    const [unverifiedEmail, setUnverifiedEmail] = useState("");
     const navigate = useNavigate();
 
     // Load remembered email on component mount
@@ -41,8 +57,47 @@ export default function Login() {
             ...prev,
             [name]: value
         }));
-        // Clear error when user starts typing
         if (error) setError("");
+    };
+
+    const resendVerificationEmail = async (email) => {
+        try {
+            setResendLoading(true);
+            setError("");
+            
+            // Sign in temporarily to get user object
+            const userCredential = await signInWithEmailAndPassword(
+                auth, 
+                email, 
+                formData.password
+            );
+            
+            const user = userCredential.user;
+            
+            // Send verification email
+            await firebaseSendEmailVerification(user, {
+                url: `${window.location.origin}/login`,
+                handleCodeInApp: true
+            });
+            
+            // Sign out after sending verification
+            await firebaseSignOut(auth);
+            
+            setSuccess(
+                <div className="space-y-2">
+                    <p className="font-semibold text-green-700">✅ Verification email sent!</p>
+                    <p className="text-sm text-gray-600">
+                        Check your inbox (and spam folder) for the verification link.
+                    </p>
+                </div>
+            );
+            
+        } catch (err) {
+            console.error("Resend verification error:", err);
+            setError(`Failed to resend verification: ${err.message}`);
+        } finally {
+            setResendLoading(false);
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -50,6 +105,7 @@ export default function Login() {
         setError("");
         setSuccess("");
         setLoading(true);
+        setUnverifiedEmail("");
 
         // Validate form
         if (!formData.email || !formData.password) {
@@ -76,7 +132,41 @@ export default function Login() {
             
             const user = userCredential.user;
             
-            // 2. Check if user exists in Firestore
+            // 2. Check if email is verified
+            if (!user.emailVerified) {
+                // Store the unverified email
+                setUnverifiedEmail(user.email);
+                
+                // Create error message with resend option
+                setError(
+                    <div className="space-y-2">
+                        <p className="font-semibold">Please verify your email address before logging in.</p>
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-2">
+                            <p className="text-sm text-yellow-700 mb-2">
+                                <FontAwesomeIcon icon={faExclamationTriangle} className="mr-2" />
+                                <strong>Email not verified:</strong> {user.email}
+                            </p>
+                            <button
+                                onClick={() => resendVerificationEmail(user.email)}
+                                disabled={resendLoading}
+                                className="text-sm bg-own-2 text-white px-3 py-1 rounded hover:bg-amber-600 transition-colors disabled:opacity-50"
+                            >
+                                {resendLoading ? "Sending..." : "Resend Verification Email"}
+                            </button>
+                            <p className="text-xs text-yellow-600 mt-2">
+                                Check your spam/junk folder if you don't see the email
+                            </p>
+                        </div>
+                    </div>
+                );
+                
+                // Sign out the unverified user
+                await firebaseSignOut(auth);
+                setLoading(false);
+                return;
+            }
+            
+            // 3. Check if user exists in Firestore
             const userDocRef = doc(db, "users", user.uid);
             const userDoc = await getDoc(userDocRef);
             
@@ -85,25 +175,30 @@ export default function Login() {
             if (userDoc.exists()) {
                 const userData = userDoc.data();
                 
-                // 3. Check if user is active
+                // 4. Check if user is active
                 if (userData.isActive === false) {
                     setError("Your account has been deactivated. Please contact support.");
+                    await firebaseSignOut(auth);
                     setLoading(false);
                     return;
                 }
                 
-                // 4. Get user role (default to "customer" if not specified)
+                // 5. Get user role (default to "customer" if not specified)
                 userRole = userData.role || "customer";
                 
-                // 5. Update last login timestamp in Firestore
+                // 6. Update last login timestamp in Firestore
                 await updateDoc(userDocRef, {
                     lastLogin: new Date().toISOString()
                 });
                 
-            } else {
-                // This shouldn't happen for existing users, but handle it
-                console.warn("User document not found in Firestore, creating one...");
+                // Update emailVerified status in Firestore if needed
+                if (!userData.emailVerified) {
+                    await updateDoc(userDocRef, {
+                        emailVerified: true
+                    });
+                }
                 
+            } else {
                 // Create basic user document with default customer role
                 await setDoc(userDocRef, {
                     uid: user.uid,
@@ -113,21 +208,21 @@ export default function Login() {
                     lastName: user.displayName?.split(" ").slice(1).join(" ") || "",
                     emailVerified: user.emailVerified,
                     isActive: true,
-                    role: "customer", // Default role for new users
+                    role: "customer",
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString(),
                     lastLogin: new Date().toISOString()
                 });
             }
             
-            // 6. Store remember me preference
+            // 7. Store remember me preference
             if (rememberMe) {
                 localStorage.setItem("userEmail", formData.email);
             } else {
                 localStorage.removeItem("userEmail");
             }
             
-            // 7. Determine redirect path based on role
+            // 8. Determine redirect path based on role
             let redirectPath = "/user/dashboard";
             
             if (userRole === "admin" || userRole === "superadmin") {
@@ -143,9 +238,9 @@ export default function Login() {
                 setSuccess("Login successful! Redirecting to dashboard...");
             }
             
-            localStorage.setItem("userData",userDoc.data);
-            // const urlParams = new URLSearchParams(window.location.search);
-            // 8. Redirect based on role after a short delay
+            localStorage.setItem("userData", JSON.stringify(userDoc.exists() ? userDoc.data() : {}));
+            
+            // 9. Redirect based on role after a short delay
             setTimeout(() => {
                 navigate(redirectPath);
             }, 1500);
@@ -194,314 +289,219 @@ export default function Login() {
     };
 
     const handleGoogleLogin = async () => {
-    try {
-        setError("");
-        setSuccess("");
-        setLoading(true);
-        
-        // 1. Create Google provider
-        const provider = new GoogleAuthProvider();
-        provider.setCustomParameters({
-            prompt: 'select_account'
-        });
-        
-        // 2. Sign in with Google popup
-        const userCredential = await signInWithPopup(auth, provider);
-        const user = userCredential.user;
-        
-        let userRole = "customer"; // Default role for Google users
-        
-        // 3. Check if email already exists with different provider (Account Merge Check)
-        const usersRef = collection(db, "users");
-        const q = query(usersRef, where("email", "==", user.email));
-        const querySnapshot = await getDocs(q);
-        
-        let existingUserWithDifferentUid = null;
-        querySnapshot.forEach((doc) => {
-            if (doc.id !== user.uid) {
-                existingUserWithDifferentUid = {
-                    id: doc.id,
-                    data: doc.data()
-                };
-            }
-        });
-        
-        // 4. If user exists with same email but different UID (different auth provider)
-        if (existingUserWithDifferentUid) {
-            const shouldMerge = window.confirm(
-                `An account with email ${user.email} already exists. Would you like to merge this Google account with your existing account?`
-            );
+        try {
+            setError("");
+            setSuccess("");
+            setLoading(true);
             
-            if (shouldMerge) {
-                // Merge accounts: Update existing document with Google provider info
-                const existingUserRef = doc(db, "users", existingUserWithDifferentUid.id);
-                
-                await updateDoc(existingUserRef, {
-                    // Link Google authentication
-                    googleUid: user.uid,
-                    photoURL: user.photoURL || existingUserWithDifferentUid.data.photoURL,
-                    emailVerified: user.emailVerified,
-                    provider: existingUserWithDifferentUid.data.provider ? 
-                        [...existingUserWithDifferentUid.data.provider, "google"] : 
-                        ["google"],
-                    updatedAt: new Date().toISOString(),
-                    lastLogin: new Date().toISOString()
-                });
-                
-                // Store the actual user ID to use for navigation
-                userRole = existingUserWithDifferentUid.data.role || "customer";
-                
-                // Navigate based on merged account role
-                let redirectPath = "/user/dashboard";
-                if (userRole === "admin" || userRole === "superadmin") {
-                    redirectPath = "/admin/dashboard";
-                } else if (userRole === "manager") {
-                    redirectPath = "/admin/dashboard";
-                } else if (userRole === "staff") {
-                    redirectPath = "/admin/orders";
-                }
-                
-                setSuccess("Accounts merged successfully! Redirecting..."); 
-                localStorage.setItem("userData",userDoc.data);
-                setTimeout(() => {
-                    navigate(redirectPath);
-                }, 1500);
-                return;
-            } else {
-                // User chose not to merge, sign them out
-                await auth.signOut();
-                setError("Please use your existing login method or create a new account with a different email.");
-                setLoading(false);
-                return;
-            }
-        }
-        
-        // 5. Check if user exists in Firestore with current UID
-        const userDocRef = doc(db, "users", user.uid);
-        const userDoc = await getDoc(userDocRef);
-        
-        if (!userDoc.exists()) {
-            // 6. Extract first and last name from Google display name
-            const firstName = user.displayName?.split(" ")[0] || "";
-            const lastName = user.displayName?.split(" ").slice(1).join(" ") || "";
-            
-            // 7. Create COMPLETE user document matching signup page structure
-            const userData = {
-                // Basic Info (same as signup)
-                uid: user.uid,
-                firstName: firstName,
-                lastName: lastName,
-                email: user.email,
-                phone: "", // Google doesn't provide phone
-                displayName: user.displayName || `${firstName} ${lastName}`,
-                
-                // Auth & Verification
-                emailVerified: user.emailVerified,
-                isActive: true,
-                role: "customer",
-                
-                // Profile
-                photoURL: user.photoURL || "",
-                provider: ["google"], // Track signup method as array for multiple providers
-                
-                // Contact Preferences (same as signup)
-                contactPreferences: {
-                    email: true,
-                    sms: false, // No phone number from Google
-                    push: true
-                },
-                
-                // Newsletter Subscription
-                subscribeNewsletter: true, // Default to true for Google users
-                
-                // Notifications Settings (same as signup)
-                notifications: {
-                    orderUpdates: true,
-                    promotions: true,
-                    newItems: true,
-                    priceDrops: true,
-                    orderReminders: true,
-                    deliveryStatus: true,
-                    marketingEmails: true
-                },
-                
-                // Addresses (Empty array to start - same as signup)
-                addresses: [],
-                defaultAddressId: null,
-                
-                // Favorites (same as signup)
-                favorites: [],
-                
-                // Orders and Cart (same as signup)
-                cart: [],
-                orderHistory: [],
-                
-                // Timestamps (same as signup)
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                lastLogin: new Date().toISOString(),
-                lastOrderDate: null,
-                
-                // Statistics (same as signup)
-                stats: {
-                    totalOrders: 0,
-                    totalSpent: 0,
-                    averageOrderValue: 0
-                }
-            };
-
-            // 8. Save complete user document
-            await setDoc(userDocRef, userData);
-            
-            // 9. Create welcome notification for new users
-            const notificationId = `welcome_${Date.now()}`;
-            const notificationRef = doc(db, "users", user.uid, "notifications", notificationId);
-            
-            await setDoc(notificationRef, {
-                id: notificationId,
-                type: "welcome",
-                title: "Welcome to Ada's Kitchen!",
-                message: "Thank you for joining with Google. Start exploring delicious meals!",
-                read: false,
-                createdAt: new Date().toISOString(),
-                actionUrl: "/menu"
+            // 1. Create Google provider
+            const provider = new GoogleAuthProvider();
+            provider.setCustomParameters({
+                prompt: 'select_account'
             });
             
-            setSuccess("Welcome! Your account has been created with Google. Redirecting..."); 
-            localStorage.setItem("userData",userData);
+            // 2. Sign in with Google popup
+            const userCredential = await signInWithPopup(auth, provider);
+            const user = userCredential.user;
             
-            // 10. Check if phone is empty and redirect to profile completion
-            setTimeout(() => {
-                navigate("/complete-profile?source=google");
-            }, 1500);
-            return; // Don't continue to regular redirect
+            let userRole = "customer"; // Default role for Google users
             
-        } else {
-            // 11. Get existing user data
-            const userData = userDoc.data();
-            userRole = userData.role || "customer";
+            // 3. Check if user exists in Firestore with current UID
+            const userDocRef = doc(db, "users", user.uid);
+            const userDoc = await getDoc(userDocRef);
             
-            // 12. Sync Profile Updates from Google
-            const profileUpdates = {};
-            
-            // Check if Google profile has newer/better information
-            if (user.displayName && user.displayName !== userData.displayName) {
-                profileUpdates.displayName = user.displayName;
+            if (!userDoc.exists()) {
+                // 4. Extract first and last name from Google display name
+                const firstName = user.displayName?.split(" ")[0] || "";
+                const lastName = user.displayName?.split(" ").slice(1).join(" ") || "";
                 
-                // Update first and last name if they're empty or different
-                const firstName = user.displayName.split(" ")[0];
-                const lastName = user.displayName.split(" ").slice(1).join(" ");
-                
-                if (!userData.firstName || firstName !== userData.firstName) {
-                    profileUpdates.firstName = firstName;
-                }
-                if (!userData.lastName || lastName !== userData.lastName) {
-                    profileUpdates.lastName = lastName;
-                }
-            }
-            
-            if (user.photoURL && user.photoURL !== userData.photoURL) {
-                profileUpdates.photoURL = user.photoURL;
-            }
-            
-            if (user.emailVerified && !userData.emailVerified) {
-                profileUpdates.emailVerified = true;
-            }
-            
-            // Add Google to providers array if not already there
-            let providers = userData.provider || [];
-            if (!providers.includes("google")) {
-                providers = [...providers, "google"];
-                profileUpdates.provider = providers;
-            }
-            
-            // 13. Update last login and any profile updates
-            if (Object.keys(profileUpdates).length > 0) {
-                profileUpdates.updatedAt = new Date().toISOString();
-            }
-            
-            profileUpdates.lastLogin = new Date().toISOString();
-            
-            await updateDoc(userDocRef, profileUpdates);
-            
-            // 14. Check if phone is empty for existing users
-            if (!userData.phone || userData.phone.trim() === "") {
-                setTimeout(() => {
-                    navigate("/complete-profile?source=google&existing=true");
-                }, 1500);
-                setSuccess("Google login successful! Please complete your profile...");
-                return;
-            }
-             
+                // 5. Create COMPLETE user document matching signup page structure
+                const userData = {
+                    uid: user.uid,
+                    firstName: firstName,
+                    lastName: lastName,
+                    email: user.email,
+                    phone: "",
+                    displayName: user.displayName || `${firstName} ${lastName}`,
+                    emailVerified: true,
+                    isActive: true,
+                    role: "customer",
+                    photoURL: user.photoURL || "",
+                    provider: ["google"],
+                    contactPreferences: {
+                        email: true,
+                        sms: false,
+                        push: true
+                    },
+                    subscribeNewsletter: true,
+                    notifications: {
+                        orderUpdates: true,
+                        promotions: true,
+                        newItems: true,
+                        priceDrops: true,
+                        orderReminders: true,
+                        deliveryStatus: true,
+                        marketingEmails: true
+                    },
+                    addresses: [],
+                    defaultAddressId: null,
+                    favorites: [],
+                    cart: [],
+                    orderHistory: [],
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    lastLogin: new Date().toISOString(),
+                    lastOrderDate: null,
+                    stats: {
+                        totalOrders: 0,
+                        totalSpent: 0,
+                        averageOrderValue: 0
+                    }
+                };
 
-            localStorage.setItem("userData",userData);
-            
-            setSuccess("Google login successful! Redirecting...");
-        }
-        
-        // 15. Check if user is active (for both new and existing users)
-        const currentUserDoc = await getDoc(userDocRef);
-        if (currentUserDoc.exists()) {
-            const userData = currentUserDoc.data();
-            
-            if (userData.isActive === false) {
-                setError("Your account has been deactivated. Please contact support.");
-                setLoading(false);
-                // Sign out since account is deactivated
-                await auth.signOut();
-                return;
+                // 6. Save complete user document
+                await setDoc(userDocRef, userData);
+                
+                // 7. Create welcome notification for new users
+                const notificationId = `welcome_${Date.now()}`;
+                const notificationRef = doc(db, "users", user.uid, "notifications", notificationId);
+                
+                await setDoc(notificationRef, {
+                    id: notificationId,
+                    type: "welcome",
+                    title: "Welcome to Ada's Kitchen!",
+                    message: "Thank you for joining with Google. Start exploring delicious meals!",
+                    read: false,
+                    createdAt: new Date().toISOString(),
+                    actionUrl: "/menu"
+                });
+                
+                setSuccess("Welcome! Your account has been created with Google. Redirecting..."); 
+                localStorage.setItem("userData", JSON.stringify(userData));
+                
+                // 8. Check if phone is empty and redirect to profile completion
+                setTimeout(() => {
+                    navigate("/complete-profile?source=google");
+                }, 1500);
+                return; // Don't continue to regular redirect
+                
+            } else {
+                // 9. Get existing user data
+                const userData = userDoc.data();
+                userRole = userData.role || "customer";
+                
+                // 10. Sync Profile Updates from Google
+                const profileUpdates = {};
+                
+                // Check if Google profile has newer/better information
+                if (user.displayName && user.displayName !== userData.displayName) {
+                    profileUpdates.displayName = user.displayName;
+                    
+                    // Update first and last name if they're empty or different
+                    const firstName = user.displayName.split(" ")[0];
+                    const lastName = user.displayName.split(" ").slice(1).join(" ");
+                    
+                    if (!userData.firstName || firstName !== userData.firstName) {
+                        profileUpdates.firstName = firstName;
+                    }
+                    if (!userData.lastName || lastName !== userData.lastName) {
+                        profileUpdates.lastName = lastName;
+                    }
+                }
+                
+                if (user.photoURL && user.photoURL !== userData.photoURL) {
+                    profileUpdates.photoURL = user.photoURL;
+                }
+                
+                // Add Google to providers array if not already there
+                let providers = userData.provider || [];
+                if (!providers.includes("google")) {
+                    providers = [...providers, "google"];
+                    profileUpdates.provider = providers;
+                }
+                
+                // 11. Update last login and any profile updates
+                if (Object.keys(profileUpdates).length > 0) {
+                    profileUpdates.updatedAt = new Date().toISOString();
+                }
+                
+                profileUpdates.lastLogin = new Date().toISOString();
+                profileUpdates.emailVerified = true; // Google users are always verified
+                
+                await updateDoc(userDocRef, profileUpdates);
+                
+                // 12. Check if user is active
+                if (userData.isActive === false) {
+                    setError("Your account has been deactivated. Please contact support.");
+                    setLoading(false);
+                    // Sign out since account is deactivated
+                    await firebaseSignOut(auth);
+                    return;
+                }
+                
+                // 13. Check if phone is empty for existing users
+                if (!userData.phone || userData.phone.trim() === "") {
+                    setSuccess("Google login successful! Please complete your profile...");
+                    localStorage.setItem("userData", JSON.stringify(userData));
+                    setTimeout(() => {
+                        navigate("/complete-profile?source=google&existing=true");
+                    }, 1500);
+                    return;
+                }
+                
+                localStorage.setItem("userData", JSON.stringify(userData));
+                setSuccess("Google login successful! Redirecting...");
             }
+            
+            // 14. Determine redirect path based on role
+            let redirectPath = "/user/dashboard";
+            
+            if (userRole === "admin" || userRole === "superadmin") {
+                redirectPath = "/admin/dashboard";
+            } else if (userRole === "manager") {
+                redirectPath = "/admin/dashboard";
+            } else if (userRole === "staff") {
+                redirectPath = "/admin/orders";
+            }
+            
+            // 15. Redirect to appropriate dashboard
+            setTimeout(() => {
+                navigate(redirectPath);
+            }, 1500);
+            
+        } catch (err) {
+            console.error("Google login error:", err);
+            
+            // Handle specific Google login errors
+            switch (err.code) {
+                case "auth/popup-closed-by-user":
+                    setError("Google login was cancelled. Please try again.");
+                    break;
+                case "auth/popup-blocked":
+                    setError("Popup was blocked by your browser. Please allow popups for this site.");
+                    break;
+                case "auth/unauthorized-domain":
+                    setError("This domain is not authorized for Google login. Please contact support.");
+                    break;
+                case "auth/operation-not-allowed":
+                    setError("Google login is not enabled. Please contact support.");
+                    break;
+                case "auth/network-request-failed":
+                    setError("Network error. Please check your internet connection.");
+                    break;
+                case "auth/cancelled-popup-request":
+                    setError("Another login popup is already open. Please close it and try again.");
+                    break;
+                case "auth/user-disabled":
+                    setError("This account has been disabled. Please contact support.");
+                    break;
+                default:
+                    setError(`Google login failed: ${err.message || "Please try again."}`);
+            }
+        } finally {
+            setLoading(false);
         }
-        
-        // 16. Determine redirect path based on role
-        let redirectPath = "/user/dashboard";
-        
-        if (userRole === "admin" || userRole === "superadmin") {
-            redirectPath = "/admin/dashboard";
-        } else if (userRole === "manager") {
-            redirectPath = "/admin/dashboard";
-        } else if (userRole === "staff") {
-            redirectPath = "/admin/orders";
-        }
-        
-        // 17. Redirect to appropriate dashboard
-        setTimeout(() => {
-            navigate(redirectPath);
-        }, 1500);
-        
-    } catch (err) {
-        console.error("Google login error:", err);
-        
-        // Handle specific Google login errors
-        switch (err.code) {
-            case "auth/popup-closed-by-user":
-                setError("Google login was cancelled. Please try again.");
-                break;
-            case "auth/popup-blocked":
-                setError("Popup was blocked by your browser. Please allow popups for this site.");
-                break;
-            case "auth/unauthorized-domain":
-                setError("This domain is not authorized for Google login. Please contact support.");
-                break;
-            case "auth/operation-not-allowed":
-                setError("Google login is not enabled. Please contact support.");
-                break;
-            case "auth/network-request-failed":
-                setError("Network error. Please check your internet connection.");
-                break;
-            case "auth/cancelled-popup-request":
-                setError("Another login popup is already open. Please close it and try again.");
-                break;
-            case "auth/user-disabled":
-                setError("This account has been disabled. Please contact support.");
-                break;
-            default:
-                setError(`Google login failed: ${err.message || "Please try again."}`);
-        }
-    } finally {
-        setLoading(false);
-    }
-};
+    };
 
     const togglePasswordVisibility = () => {
         setShowPassword(!showPassword);
@@ -540,13 +540,19 @@ export default function Login() {
 
                         {/* Error Message */}
                         {error && (
-                            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl animate-pulse">
+                            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
                                 <div className="flex items-start">
                                     <FontAwesomeIcon 
                                         icon={faExclamationCircle} 
                                         className="h-5 w-5 text-red-400 mr-3 mt-0.5 flex-shrink-0" 
                                     />
-                                    <p className="text-sm text-red-700 font-medium">{error}</p>
+                                    <div className="flex-1">
+                                        {typeof error === 'string' ? (
+                                            <p className="text-sm text-red-700 font-medium">{error}</p>
+                                        ) : (
+                                            error
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -559,14 +565,40 @@ export default function Login() {
                                         icon={faCheckCircle} 
                                         className="h-5 w-5 text-green-400 mr-3 mt-0.5 flex-shrink-0" 
                                     />
-                                    <div>
-                                        <p className="text-sm text-green-700 font-medium">{success}</p>
-                                        {loading && (
-                                            <div className="mt-2 flex items-center">
-                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-700 mr-2"></div>
-                                                <span className="text-xs text-green-600">Redirecting...</span>
-                                            </div>
+                                    <div className="flex-1">
+                                        {typeof success === 'string' ? (
+                                            <>
+                                                <p className="text-sm text-green-700 font-medium">{success}</p>
+                                                {loading && (
+                                                    <div className="mt-2 flex items-center">
+                                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-700 mr-2"></div>
+                                                        <span className="text-xs text-green-600">Redirecting...</span>
+                                                    </div>
+                                                )}
+                                            </>
+                                        ) : (
+                                            success
                                         )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Email Verification Notice (only show if no unverified email error) */}
+                        {!unverifiedEmail && (
+                            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                                <div className="flex items-start">
+                                    <FontAwesomeIcon 
+                                        icon={faExclamationTriangle} 
+                                        className="h-5 w-5 text-blue-400 mr-3 mt-0.5 flex-shrink-0" 
+                                    />
+                                    <div>
+                                        <p className="text-sm text-blue-700 font-medium mb-1">
+                                            Email Verification Required
+                                        </p>
+                                        <p className="text-xs text-blue-600">
+                                            If you signed up with email/password, you must verify your email before logging in.
+                                        </p>
                                     </div>
                                 </div>
                             </div>

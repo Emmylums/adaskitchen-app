@@ -39,6 +39,7 @@ import CompleteProfile from "./pages/CompleteProfile";
 import Checkout from "./users/pages/Checkout";
 import { Elements } from "@stripe/react-stripe-js";
 import { stripePromise } from "./stripe";
+import EmailVerification from "./pages/EmailVerification";
 
 
 
@@ -74,6 +75,7 @@ function App() {
         <Route exact path="/complete-profile" element={<CompleteProfile/>}/>
         <Route exact path="/forgot-password" element={<ForgotPassword/>}/>
         <Route exact path="/reset-password" element={<ResetPassword/>}/>
+        <Route exact path="/verify-email" element={<EmailVerification/>}/>
         
 
 

@@ -41,32 +41,10 @@ export default function ForgotPassword() {
         }
 
         try {
-            // IMPORTANT: Configure actionCodeSettings with your custom URL
-            const actionCodeSettings = {
-                // URL to redirect to after email verification
-                url: `${window.location.origin}/reset-password`,
-                // This must be true for deep linking to work
-                handleCodeInApp: true,
-                // iOS app configuration (if you have one)
-                // iOS: {
-                //     bundleId: 'com.yourcompany.yourapp'
-                // },
-                // Android app configuration (if you have one)
-                // android: {
-                //     packageName: 'com.yourcompany.yourapp',
-                //     installApp: true,
-                //     minimumVersion: '12'
-                // },
-                // Additional dynamic link domain (for Firebase Dynamic Links)
-                // dynamicLinkDomain: 'yourdomain.page.link'
-            };
-
-            console.log("Redirect URL:", actionCodeSettings.url); // Debug log
-            
-            // Send password reset email with custom settings
+            // Send password reset email
             await sendPasswordResetEmail(auth, email, {
-                url: "https://adaskitchen.uk/reset-password",
-                handleCodeInApp: true
+                url: `${window.location.origin}/reset-password`,
+                handleCodeInApp: false // Set to false for password reset
             });
             
             setEmailSent(true);
@@ -94,12 +72,6 @@ export default function ForgotPassword() {
                     break;
                 case "auth/operation-not-allowed":
                     setError("Password reset is not enabled. Please contact support.");
-                    break;
-                case "auth/invalid-continue-uri":
-                    setError("Invalid redirect URL configuration. Please contact support.");
-                    break;
-                case "auth/unauthorized-continue-uri":
-                    setError("The redirect URL is not authorized. Please contact support.");
                     break;
                 default:
                     setError(`Failed to send reset email: ${err.message || "Please try again."}`);

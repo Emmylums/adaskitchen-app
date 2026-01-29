@@ -1,16 +1,28 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import NavBar from "../components/NavBar";
 import MobileNavBar from "../components/MobileNavBar";
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from "react-router-dom";
 import Footer from "../components/Footer";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEye, faEyeSlash, faEnvelope, faLock, faUser, faPhone,  } from "@fortawesome/free-solid-svg-icons";
+import { 
+  faEye, 
+  faEyeSlash, 
+  faEnvelope, 
+  faLock, 
+  faUser, 
+  faPhone, 
+  faExclamationTriangle,
+  faCheckCircle,
+  faClock
+} from "@fortawesome/free-solid-svg-icons";
 import { useAuth } from "../context/AuthContext"; 
 import bg from "../assets/background.jpeg";
-import { collection, doc, setDoc, getDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import { faGoogle } from "@fortawesome/free-brands-svg-icons";
+import { updateProfile, signOut } from "firebase/auth";
+import { auth } from "../firebaseConfig";
 
 export default function SignUp() {
     const [mobileNavBarVisible, setMobileNavBarVisible] = useState(false);
@@ -18,9 +30,9 @@ export default function SignUp() {
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
-    const [success, setSuccess] = useState(false);
+    const [success, setSuccess] = useState(null); // null, "verify", or "completed"
     
-    const { signup, signInWithGoogle, user } = useAuth();
+    const { signup, signInWithGoogle, user, sendEmailVerification } = useAuth();
     const navigate = useNavigate();
 
     const [formData, setFormData] = useState({
@@ -46,7 +58,7 @@ export default function SignUp() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError("");
-        setSuccess(false);
+        setSuccess(null);
 
         // Validation
         if (!formData.acceptTerms) {
@@ -63,32 +75,20 @@ export default function SignUp() {
 
         try {
             setLoading(true);
-            console.log("1. Starting signup process...");
             
             // 1. Create user with Firebase Authentication
-            console.log("2. Creating user with Firebase Auth...");
             const userCredential = await signup(formData.email, formData.password);
             const firebaseUser = userCredential.user;
-            console.log("3. Firebase Auth user created:", firebaseUser.uid);
             
-            // 2. Update user profile
-            console.log("4. Updating user profile...");
-            try {
-                await firebaseUser.updateProfile({
-                    displayName: `${formData.firstName} ${formData.lastName}`
-                });
-                console.log("5. Profile updated successfully");
-                
-                // Refresh user token to get updated profile
-                await firebaseUser.reload();
-                console.log("6. User token refreshed");
-            } catch (profileError) {
-                console.warn("Profile update warning (continuing anyway):", profileError);
-                // Continue even if profile update fails
-            }
+            // 2. Update user profile with display name
+            await updateProfile(firebaseUser, {
+                displayName: `${formData.firstName} ${formData.lastName}`
+            });
 
-            // 3. Create user document in Firestore
-            console.log("7. Creating user document in Firestore...");
+            // 3. Send email verification
+            await sendEmailVerification(firebaseUser);
+
+            // 4. Create user document in Firestore
             const userRef = doc(db, "users", firebaseUser.uid);
             
             const userData = {
@@ -101,7 +101,7 @@ export default function SignUp() {
                 displayName: `${formData.firstName} ${formData.lastName}`,
                 
                 // Auth & Verification
-                emailVerified: firebaseUser.emailVerified,
+                emailVerified: false,
                 isActive: true,
                 role: "customer",
                 
@@ -129,10 +129,8 @@ export default function SignUp() {
                     marketingEmails: formData.subscribeNewsletter
                 },
                 
-                // Addresses (Empty array to start)
+                // Addresses
                 addresses: [],
-                
-                // Default Address
                 defaultAddressId: null,
                 
                 // Favorites
@@ -145,7 +143,7 @@ export default function SignUp() {
                 // Timestamps
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
-                lastLogin: new Date().toISOString(),
+                lastLogin: null,
                 lastOrderDate: null,
                 
                 // Statistics
@@ -157,42 +155,30 @@ export default function SignUp() {
             };
 
             await setDoc(userRef, userData);
-            console.log("8. User document created successfully");
 
-            // 4. Create welcome notification
-            console.log("9. Creating welcome notification...");
-            try {
-                const notificationId = `welcome_${Date.now()}`;
-                const notificationRef = doc(db, "users", firebaseUser.uid, "notifications", notificationId);
-                
-                await setDoc(notificationRef, {
-                    id: notificationId,
-                    type: "welcome",
-                    title: "Welcome to Ada's Kitchen!",
-                    message: "Thank you for joining our culinary family. Start exploring delicious meals!",
-                    read: false,
-                    createdAt: new Date().toISOString(),
-                    actionUrl: "/menu"
-                });
-                console.log("10. Notification created successfully");
-            } catch (notifError) {
-                console.warn("Notification creation failed (continuing anyway):", notifError);
-                // Continue even if notification fails
-            }
-            setSuccess(true);
-            console.log("✅ User account created successfully");
+            // 5. Create verification notification
+            const notificationId = `verify_${Date.now()}`;
+            const notificationRef = doc(db, "users", firebaseUser.uid, "notifications", notificationId);
             
-            // 5. Show success message and redirect to login page after a second
-            setTimeout(() => {
-                navigate("/login");
-            }, 1500);
-
-        } catch (err) {
-            console.error("❌ Signup error details:", {
-                code: err.code,
-                message: err.message,
-                stack: err.stack
+            await setDoc(notificationRef, {
+                id: notificationId,
+                type: "verification",
+                title: "Verify Your Email",
+                message: "Please check your email to verify your account. You must verify before logging in.",
+                read: false,
+                createdAt: new Date().toISOString(),
+                actionUrl: "/login",
+                isUrgent: true
             });
+
+            // 6. Sign out the user immediately after signup
+            await signOut(auth);
+            
+            // 7. Set success state to "verify" to show verification message
+            setSuccess("verify");
+            
+        } catch (err) {
+            console.error("Signup error:", err);
             
             // Handle specific Firebase errors
             switch (err.code) {
@@ -210,7 +196,9 @@ export default function SignUp() {
                     break;
                 case "permission-denied":
                     setError("Database permission denied. Please check your security rules.");
-                    console.error("Firestore permission denied. Check security rules in Firebase Console.");
+                    break;
+                case "auth/too-many-requests":
+                    setError("Too many requests. Please try again later.");
                     break;
                 default:
                     setError(`Signup failed: ${err.message || "Unknown error"}`);
@@ -224,6 +212,7 @@ export default function SignUp() {
         try {
             setError("");
             setLoading(true);
+            setSuccess(null);
             
             const userCredential = await signInWithGoogle();
             const firebaseUser = userCredential.user;
@@ -235,33 +224,22 @@ export default function SignUp() {
                 // Create user document for new Google signups
                 const userRef = doc(db, "users", firebaseUser.uid);
                 await setDoc(userRef, {
-                    // Basic Info
                     uid: firebaseUser.uid,
                     firstName: firebaseUser.displayName?.split(" ")[0] || "",
                     lastName: firebaseUser.displayName?.split(" ").slice(1).join(" ") || "",
                     email: firebaseUser.email,
                     phone: "",
                     displayName: firebaseUser.displayName || "",
-                    
-                    // Auth & Verification
-                    emailVerified: firebaseUser.emailVerified,
+                    emailVerified: true,
                     isActive: true,
                     role: "customer",
-                    
-                    // Profile
                     photoURL: firebaseUser.photoURL || "",
-                    
-                    // Contact Preferences
                     contactPreferences: {
                         email: true,
                         sms: false,
                         push: true
                     },
-                    
-                    // Newsletter Subscription
                     subscribeNewsletter: true,
-                    
-                    // Notifications Settings
                     notifications: {
                         orderUpdates: true,
                         promotions: true,
@@ -271,25 +249,15 @@ export default function SignUp() {
                         deliveryStatus: true,
                         marketingEmails: true
                     },
-                    
-                    // Addresses
                     addresses: [],
                     defaultAddressId: null,
-                    
-                    // Favorites
                     favorites: [],
-                    
-                    // Orders
                     cart: [],
                     orderHistory: [],
-                    
-                    // Timestamps
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString(),
                     lastLogin: new Date().toISOString(),
                     lastOrderDate: null,
-                    
-                    // Statistics
                     stats: {
                         totalOrders: 0,
                         totalSpent: 0,
@@ -297,7 +265,7 @@ export default function SignUp() {
                     }
                 });
 
-                // Add welcome notification after user document is created
+                // Add welcome notification
                 const notificationId = `welcome_${Date.now()}`;
                 const notificationRef = doc(db, "users", firebaseUser.uid, "notifications", notificationId);
                 
@@ -308,12 +276,15 @@ export default function SignUp() {
                     message: "Thank you for joining with Google. Start exploring delicious meals!",
                     read: false,
                     createdAt: new Date().toISOString(),
-                    actionUrl: "/user/menu"
+                    actionUrl: "/menu"
                 });
             }
             
-            // Navigate to dashboard for Google signup (user is already logged in)
-            navigate("/user/dashboard");
+            // Navigate to dashboard for Google signup
+            setSuccess("completed");
+            setTimeout(() => {
+                navigate("/user/dashboard");
+            }, 1500);
             
         } catch (err) {
             console.error("Google signup error:", err);
@@ -331,12 +302,30 @@ export default function SignUp() {
         setShowConfirmPassword(!showConfirmPassword);
     };
 
-    // If user is already logged in, redirect to dashboard
-    React.useEffect(() => {
-        if (user) {
+    // If user is already logged in and verified, redirect to dashboard
+    useEffect(() => {
+        if (user && user.emailVerified) {
             navigate("/user/dashboard");
         }
     }, [user, navigate]);
+
+    const handleResendVerification = async () => {
+        if (!user) {
+            setError("Please sign in first to resend verification email.");
+            return;
+        }
+        
+        try {
+            setLoading(true);
+            await sendEmailVerification(user);
+            setSuccess("verify");
+            setError("");
+        } catch (err) {
+            setError(`Failed to resend verification: ${err.message}`);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <>
@@ -368,21 +357,70 @@ export default function SignUp() {
                             Create Account
                         </h2>
 
-                        {/* Success Message */}
-                        {success && (
+                        {/* Email Verification Success Message */}
+                        {success === "verify" && (
+                            <div className="mb-6 p-6 bg-blue-50 border border-blue-200 rounded-xl">
+                                <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center">
+                                    <FontAwesomeIcon 
+                                        icon={faEnvelope} 
+                                        className="w-8 h-8 text-blue-600" 
+                                    />
+                                </div>
+                                <h3 className="text-xl font-bold text-blue-700 mb-3 text-center">
+                                    Verify Your Email Address
+                                </h3>
+                                <div className="space-y-3 text-center">
+                                    <p className="text-blue-600">
+                                        We've sent a verification email to: <br/>
+                                        <span className="font-semibold">{formData.email}</span>
+                                    </p>
+                                    <p className="text-sm text-gray-600">
+                                        Please check your inbox and click the verification link to activate your account.
+                                    </p>
+                                    <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-4 mt-4">
+                                        <p className="text-sm text-yellow-700 mb-2">
+                                            <FontAwesomeIcon icon={faExclamationTriangle} className="mr-2" />
+                                            <strong>Important:</strong> You must verify your email before you can log in.
+                                        </p>
+                                        <ul className="text-xs text-yellow-600 space-y-1 pl-5 list-disc">
+                                            <li>Check your spam/junk folder if you don't see the email</li>
+                                            <li>The verification link expires in 24 hours</li>
+                                            <li>Can't find the email? Try the login page to resend verification</li>
+                                        </ul>
+                                    </div>
+                                    <div className="pt-4 space-y-3">
+                                        <Link 
+                                            to="/login" 
+                                            className="inline-block w-full bg-own-2 text-white px-6 py-3 rounded-xl hover:bg-amber-600 transition-colors"
+                                        >
+                                            Go to Login
+                                        </Link>
+                                        <button
+                                            onClick={handleResendVerification}
+                                            disabled={loading}
+                                            className="inline-block w-full bg-gray-100 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50"
+                                        >
+                                            {loading ? "Sending..." : "Resend Verification Email"}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Google Signup Success Message */}
+                        {success === "completed" && (
                             <div className="mb-6 p-6 bg-green-50 border border-green-200 rounded-xl text-center">
                                 <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
-                                    <svg className="w-8 h-8 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                    </svg>
+                                    <FontAwesomeIcon icon={faCheckCircle} className="w-8 h-8 text-green-600" />
                                 </div>
                                 <h3 className="text-xl font-bold text-green-700 mb-2">Account Created Successfully!</h3>
                                 <p className="text-green-600 mb-4">
-                                    Your account has been created. You will be redirected to the login page in a few seconds.
+                                    Redirecting to your dashboard...
                                 </p>
-                                <p className="text-sm text-gray-600 mb-4">
-                                    Didn't get redirected? <Link to="/login" className="text-own-2 hover:text-amber-600 font-medium">Click here</Link>
-                                </p>
+                                <div className="flex items-center justify-center">
+                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-600 mr-2"></div>
+                                    <span className="text-sm text-gray-600">Please wait</span>
+                                </div>
                             </div>
                         )}
 
@@ -550,7 +588,7 @@ export default function SignUp() {
                                                 value={formData.confirmPassword}
                                                 onChange={handleInputChange}
                                                 disabled={loading}
-                                                className="block w-full pl-10 pr-12 py-4 border border-gray-300 rounded-xl placeholder-gray-400 focus:ring-2 focus:ring-own-2 focus:border-own-2 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                                className="block w-full pl-10 pr-12 py-4 border border-gray-300 rounded-xl placeholder-gray-400 focus:ring-2 focus:ring-own-2 focus:border-own-2 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed text-black"
                                                 placeholder="Confirm your password"
                                                 minLength="6"
                                             />

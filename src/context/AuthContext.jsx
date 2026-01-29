@@ -7,7 +7,8 @@ import {
   sendPasswordResetEmail,
   updateProfile,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  sendEmailVerification as firebaseSendEmailVerification
 } from 'firebase/auth';
 import { auth } from '../firebaseConfig';
 
@@ -20,8 +21,27 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   // Signup with email and password
-  const signup = (email, password) => {
-    return createUserWithEmailAndPassword(auth, email, password);
+  const signup = async (email, password) => {
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      return userCredential;
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  // Send email verification
+  const sendEmailVerification = async (user) => {
+    try {
+      await firebaseSendEmailVerification(user, {
+        url: `${window.location.origin}/verify-email`,
+        handleCodeInApp: true
+      });
+      return true;
+    } catch (error) {
+      console.error("Error sending verification email:", error);
+      throw error;
+    }
   };
 
   // Login with email and password
@@ -39,11 +59,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Logout
-  // In your AuthContext.js
   const logout = async () => {
     try {
       await signOut(auth);
-      // Clear any local state if needed
       setUser(null);
       console.log("User signed out successfully");
     } catch (error) {
@@ -54,7 +72,10 @@ export const AuthProvider = ({ children }) => {
 
   // Reset password
   const resetPassword = (email) => {
-    return sendPasswordResetEmail(auth, email);
+    return sendPasswordResetEmail(auth, email, {
+      url: `${window.location.origin}/verify-email`,
+      handleCodeInApp: true
+    });
   };
 
   // Update user profile
@@ -80,7 +101,8 @@ export const AuthProvider = ({ children }) => {
     logout,
     resetPassword,
     updateUserProfile,
-    signInWithGoogle
+    signInWithGoogle,
+    sendEmailVerification
   };
 
   return (
@@ -89,113 +111,3 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
-
-
-
-// import React, { createContext, useContext, useEffect, useState } from 'react';
-// import { 
-//   onAuthStateChanged, 
-//   signOut, 
-//   GoogleAuthProvider, 
-//   signInWithPopup,
-//   createUserWithEmailAndPassword,
-//   signInWithEmailAndPassword,
-//   sendPasswordResetEmail,
-//   updateProfile
-// } from 'firebase/auth';
-// import { auth } from '../firebaseConfig';
-
-// const AuthContext = createContext({});
-
-// export const useAuth = () => useContext(AuthContext);
-
-// export const AuthProvider = ({ children }) => {
-//   const [user, setUser] = useState(null);
-//   const [loading, setLoading] = useState(true);
-
-//   useEffect(() => {
-//     const unsubscribe = onAuthStateChanged(auth, (user) => {
-//       if (user) {
-//         setUser({
-//           uid: user.uid,
-//           email: user.email,
-//           displayName: user.displayName,
-//           photoURL: user.photoURL
-//         });
-//       } else {
-//         setUser(null);
-//       }
-//       setLoading(false);
-//     });
-
-//     return () => unsubscribe();
-//   }, []);
-
-//   // Email/Password Sign Up
-//   const signup = (email, password) => {
-//     return createUserWithEmailAndPassword(auth, email, password);
-//   };
-
-//   // Email/Password Login
-//   const login = (email, password) => {
-//     return signInWithEmailAndPassword(auth, email, password);
-//   };
-
-//   // Google Sign In
-//   const signInWithGoogle = () => {
-//     const provider = new GoogleAuthProvider();
-//     return signInWithPopup(auth, provider);
-//   };
-
-//   // Logout
-//   const logout = async () => {
-//     setUser(null);
-//     await signOut(auth);
-//   };
-
-//   // Reset Password
-//   const resetPassword = (email) => {
-//     return sendPasswordResetEmail(auth, email);
-//   };
-
-//   // Update Profile
-//   const updateUserProfile = (displayName, photoURL) => {
-//     return updateProfile(auth.currentUser, {
-//       displayName,
-//       photoURL
-//     });
-//   };
-
-//   const value = {
-//     user,
-//     loading,
-//     signup,
-//     login,
-//     logout,
-//     signInWithGoogle,
-//     resetPassword,
-//     updateUserProfile
-//   };
-
-//   return (
-//     <AuthContext.Provider value={value}>
-//       {!loading && children}
-//     </AuthContext.Provider>
-//   );
-// };
-
-// import React, { createContext, useContext, useState } from "react";
-
-// const AuthContext = createContext();
-
-// export const AuthProvider = ({ children }) => {
-//   const [userRole, setUserRole] = useState("manager"); // or "employee"
-
-//   return (
-//     <AuthContext.Provider value={{ userRole, setUserRole }}>
-//       {children}
-//     </AuthContext.Provider>
-//   );
-// };
-
-// export const useAuth = () => useContext(AuthContext);
