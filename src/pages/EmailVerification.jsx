@@ -17,12 +17,11 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { 
   applyActionCode, 
-  checkActionCode, 
-  verifyPasswordResetCode,
-  confirmPasswordReset
+  checkActionCode,
+  verifyPasswordResetCode
 } from "firebase/auth";
 import { auth } from "../firebaseConfig";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, getDoc } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 
 export default function EmailVerification() {
@@ -34,6 +33,7 @@ export default function EmailVerification() {
     const [verifying, setVerifying] = useState(true);
     const [error, setError] = useState("");
     const [email, setEmail] = useState("");
+    const [userId, setUserId] = useState("");
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -42,10 +42,10 @@ export default function EmailVerification() {
         const apiKey = searchParams.get("apiKey");
         const lang = searchParams.get("lang") || "en";
         
-        console.log("EmailVerification component loaded with params:", {
-            oobCode: code,
+        console.log("📧 EmailVerification component loaded with params:", {
+            oobCode: code ? `${code.substring(0, 10)}...` : "none",
             mode: modeParam,
-            apiKey: apiKey,
+            apiKey: apiKey ? "present" : "none",
             lang: lang,
             allParams: Object.fromEntries(searchParams.entries())
         });
@@ -53,73 +53,88 @@ export default function EmailVerification() {
         if (code && modeParam) {
             setOobCode(code);
             setMode(modeParam);
-            handleActionCode(code, modeParam);
+            
+            // Handle based on mode
+            if (modeParam === "verifyEmail") {
+                handleEmailVerification(code);
+            } else if (modeParam === "resetPassword") {
+                // Handle password reset separately
+                handlePasswordResetVerification(code);
+            } else {
+                setError(`Unknown action mode: ${modeParam}`);
+                setVerifying(false);
+            }
         } else {
             setError("Invalid verification link. Missing required parameters.");
-            console.error("Missing parameters in verification link");
+            console.error("❌ Missing parameters in verification link");
             setVerifying(false);
         }
     }, [searchParams]);
 
-    const handleActionCode = async (code, mode) => {
+    const handleEmailVerification = async (code) => {
         try {
-            console.log(`Handling action code for mode: ${mode}, code length: ${code?.length}`);
+            console.log("🔐 Starting email verification process...");
             
-            if (mode === "verifyEmail") {
-                // For email verification
-                console.log("Attempting to verify email with code...");
-                await applyActionCode(auth, code);
+            // 1. First, check if the action code is valid
+            console.log("🔍 Checking action code validity...");
+            const actionCodeInfo = await checkActionCode(auth, code);
+            console.log("✅ Action code info:", {
+                email: actionCodeInfo.data.email,
+                uid: actionCodeInfo.data.uid,
+                operation: actionCodeInfo.data.operation
+            });
+            
+            const userEmail = actionCodeInfo.data.email;
+            const userUid = actionCodeInfo.data.uid;
+            setEmail(userEmail);
+            setUserId(userUid);
+            
+            // 2. Apply the action code to verify the email
+            console.log("📝 Applying action code to verify email...");
+            await applyActionCode(auth, code);
+            console.log("✅ Email verification applied successfully");
+            
+            // 3. Update Firestore to mark email as verified
+            console.log("📊 Updating Firestore for user:", userUid);
+            try {
+                const userRef = doc(db, "users", userUid);
+                await updateDoc(userRef, {
+                    emailVerified: true,
+                    updatedAt: new Date().toISOString(),
+                    lastVerification: new Date().toISOString()
+                });
+                console.log("✅ Firestore updated successfully");
                 
-                // Get email from action code
-                const info = await checkActionCode(auth, code);
-                console.log("Action code info retrieved:", info.data.email);
-                const userEmail = info.data.email;
-                setEmail(userEmail);
-                
-                // Try to update Firestore to mark email as verified
+                // Also update any notifications
                 try {
-                    // We need to find the user by email since we might not have currentUser
-                    const userRef = doc(db, "users", info.data.uid || "unknown");
-                    await updateDoc(userRef, {
-                        emailVerified: true,
-                        updatedAt: new Date().toISOString()
-                    });
-                    console.log("Firestore updated for user:", info.data.uid);
-                } catch (firestoreError) {
-                    console.warn("Could not update Firestore, but email verification succeeded:", firestoreError);
-                    // Continue even if Firestore update fails
+                    const notificationId = `verified_${Date.now()}`;
+                    const notificationRef = doc(db, "users", userUid, "notifications", notificationId);
+                    
+                    await updateDoc(notificationRef, {
+                        id: notificationId,
+                        type: "verification_success",
+                        title: "Email Verified!",
+                        message: `Your email ${userEmail} has been successfully verified.`,
+                        read: false,
+                        createdAt: new Date().toISOString(),
+                        actionUrl: "/login"
+                    }, { merge: true });
+                    console.log("✅ Verification notification created");
+                } catch (notifError) {
+                    console.warn("⚠️ Could not create notification:", notifError);
                 }
                 
-                setVerified(true);
-                console.log("Email verification successful!");
-                
-            } else if (mode === "resetPassword") {
-                // For password reset - verify the code is valid without applying it
-                console.log("Handling password reset verification...");
-                
-                // IMPORTANT: Use verifyPasswordResetCode to check if code is valid
-                // but DON'T apply it yet - that happens on the reset password page
-                const verifiedEmail = await verifyPasswordResetCode(auth, code);
-                console.log("Password reset code verified for email:", verifiedEmail);
-                setEmail(verifiedEmail);
-                
-                // Store the reset code in sessionStorage for the reset password page
-                sessionStorage.setItem('resetPasswordCode', code);
-                sessionStorage.setItem('resetPasswordEmail', verifiedEmail);
-                
-                setVerified(true);
-                console.log("Password reset code verified, navigating to reset-password");
-                
-                // Navigate to reset password page
-                navigate(`/reset-password?oobCode=${encodeURIComponent(code)}&email=${encodeURIComponent(verifiedEmail)}`);
-                return;
-                
-            } else {
-                console.error("Invalid mode parameter:", mode);
-                setError(`Invalid action mode: ${mode}`);
+            } catch (firestoreError) {
+                console.warn("⚠️ Could not update Firestore:", firestoreError);
+                // Continue even if Firestore update fails - the email is still verified in Firebase Auth
             }
+            
+            // 4. Mark as verified
+            setVerified(true);
+            console.log("🎉 Email verification COMPLETE!");
+            
         } catch (err) {
-            console.error("Action code error details:", {
+            console.error("❌ Email verification error:", {
                 code: err.code,
                 message: err.message,
                 fullError: err
@@ -127,7 +142,7 @@ export default function EmailVerification() {
             
             // More specific error handling
             if (err.code === "auth/expired-action-code") {
-                setError("This verification link has expired. Please request a new one.");
+                setError("This verification link has expired. Please request a new verification email.");
             } else if (err.code === "auth/invalid-action-code") {
                 setError("Invalid verification link. The link may have already been used or is malformed.");
             } else if (err.code === "auth/user-disabled") {
@@ -136,24 +151,60 @@ export default function EmailVerification() {
                 setError("No account found with this email address.");
             } else if (err.code === "auth/argument-error") {
                 setError("Invalid verification link format. Please check the link and try again.");
-            } else if (err.message?.includes("resetPassword")) {
-                setError("This password reset link is invalid or has expired. Please request a new password reset email.");
             } else {
-                setError(`Failed to process verification: ${err.message || "Please try again."}`);
+                setError(`Failed to verify email: ${err.message || "Please try again."}`);
             }
         } finally {
             setVerifying(false);
         }
     };
 
-    // Handle reset password separately if needed
-    const handlePasswordReset = async (code, newPassword) => {
+    const handlePasswordResetVerification = async (code) => {
         try {
-            await confirmPasswordReset(auth, code, newPassword);
-            return true;
-        } catch (error) {
-            console.error("Password reset error:", error);
-            throw error;
+            console.log("🔐 Handling password reset verification...");
+            
+            // For password reset, we just verify the code is valid
+            const verifiedEmail = await verifyPasswordResetCode(auth, code);
+            console.log("✅ Password reset code verified for:", verifiedEmail);
+            
+            // Store in sessionStorage for the reset password page
+            sessionStorage.setItem('resetPasswordCode', code);
+            sessionStorage.setItem('resetPasswordEmail', verifiedEmail);
+            
+            // Navigate to reset password page
+            console.log("↪️ Redirecting to reset password page...");
+            navigate(`/reset-password?oobCode=${encodeURIComponent(code)}&email=${encodeURIComponent(verifiedEmail)}`);
+            
+        } catch (err) {
+            console.error("❌ Password reset verification error:", err);
+            
+            if (err.code === "auth/expired-action-code") {
+                setError("This password reset link has expired. Please request a new one.");
+            } else if (err.code === "auth/invalid-action-code") {
+                setError("Invalid password reset link. Please request a new one.");
+            } else if (err.code === "auth/user-disabled") {
+                setError("This account has been disabled. Please contact support.");
+            } else if (err.code === "auth/user-not-found") {
+                setError("No account found with this email address.");
+            } else {
+                setError(`Invalid password reset link: ${err.message || "Please try again."}`);
+            }
+            setVerifying(false);
+        }
+    };
+
+    const resendVerificationEmail = async () => {
+        try {
+            setVerifying(true);
+            setError("");
+            
+            // You would need to sign in and resend verification
+            // For now, redirect to login page where they can resend
+            navigate("/login");
+            
+        } catch (err) {
+            setError(`Failed to resend verification: ${err.message}`);
+            setVerifying(false);
         }
     };
 
@@ -185,19 +236,21 @@ export default function EmailVerification() {
                         transition={{ duration: 0.6 }}
                         className="bg-white rounded-2xl shadow-lg p-8 text-center"
                     >
-                        {verifying ? (
+                        {mode === "resetPassword" && verifying ? (
                             <div className="py-12">
                                 <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-own-2 mx-auto mb-4 flex items-center justify-center">
                                     <FontAwesomeIcon icon={faSpinner} className="h-8 w-8 text-own-2" />
                                 </div>
-                                <h3 className="text-xl font-bold text-gray-800 mb-2">
-                                    {mode === "verifyEmail" ? "Verifying Your Email..." : "Processing Password Reset..."}
-                                </h3>
-                                <p className="text-gray-600">
-                                    {mode === "verifyEmail" 
-                                        ? "Please wait while we verify your email address" 
-                                        : "Please wait while we process your password reset request"}
-                                </p>
+                                <h3 className="text-xl font-bold text-gray-800 mb-2">Processing Password Reset...</h3>
+                                <p className="text-gray-600">Redirecting you to password reset page...</p>
+                            </div>
+                        ) : verifying ? (
+                            <div className="py-12">
+                                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-own-2 mx-auto mb-4 flex items-center justify-center">
+                                    <FontAwesomeIcon icon={faSpinner} className="h-8 w-8 text-own-2" />
+                                </div>
+                                <h3 className="text-xl font-bold text-gray-800 mb-2">Verifying Your Email...</h3>
+                                <p className="text-gray-600">Please wait while we verify your email address</p>
                                 <div className="mt-4 text-xs text-gray-500 space-y-1">
                                     <p>Mode: <span className="font-medium">{mode || "Loading..."}</span></p>
                                     <p>Code: <span className="font-mono">{oobCode ? `${oobCode.substring(0, 15)}...` : "No code"}</span></p>
@@ -223,17 +276,16 @@ export default function EmailVerification() {
                                             <ul className="text-xs text-yellow-600 space-y-1">
                                                 {mode === "verifyEmail" ? (
                                                     <>
-                                                        <li>• Make sure you're clicking the link from the same device/browser where you requested verification</li>
                                                         <li>• Verification links expire after 24 hours</li>
                                                         <li>• Try requesting a new verification email from the login page</li>
                                                         <li>• Check that you haven't already verified this email</li>
+                                                        <li>• Make sure you're clicking the exact link from the email</li>
                                                     </>
                                                 ) : (
                                                     <>
                                                         <li>• Password reset links expire after 1 hour</li>
                                                         <li>• Request a new password reset link from the login page</li>
                                                         <li>• Make sure you're using the exact link from the email</li>
-                                                        <li>• Try copying and pasting the link instead of clicking it</li>
                                                     </>
                                                 )}
                                             </ul>
@@ -244,19 +296,19 @@ export default function EmailVerification() {
                                 <div className="space-y-3">
                                     {mode === "verifyEmail" ? (
                                         <>
+                                            <button
+                                                onClick={resendVerificationEmail}
+                                                className="inline-flex items-center justify-center w-full py-3 px-4 bg-own-2 text-white font-medium rounded-xl hover:bg-amber-600 transition-colors"
+                                            >
+                                                <FontAwesomeIcon icon={faEnvelope} className="mr-2 h-4 w-4" />
+                                                Request New Verification Email
+                                            </button>
                                             <Link 
                                                 to="/login" 
-                                                className="inline-flex items-center justify-center w-full py-3 px-4 bg-own-2 text-white font-medium rounded-xl hover:bg-amber-600 transition-colors"
+                                                className="inline-flex items-center justify-center w-full py-3 px-4 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors"
                                             >
                                                 <FontAwesomeIcon icon={faArrowRight} className="mr-2 h-4 w-4 rotate-180" />
                                                 Go to Login
-                                            </Link>
-                                            <Link 
-                                                to="/forgot-password" 
-                                                className="inline-flex items-center justify-center w-full py-3 px-4 border border-own-2 text-own-2 font-medium rounded-xl hover:bg-own-2 hover:text-white transition-colors"
-                                            >
-                                                <FontAwesomeIcon icon={faKey} className="mr-2 h-4 w-4" />
-                                                Reset Password
                                             </Link>
                                         </>
                                     ) : (
@@ -311,17 +363,6 @@ export default function EmailVerification() {
                                 </div>
                             </div>
                         ) : null}
-                        
-                        {/* Show loading if navigating away for password reset */}
-                        {mode === "resetPassword" && verifying === false && error === "" && !verified && (
-                            <div className="py-12">
-                                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-own-2 mx-auto mb-4 flex items-center justify-center">
-                                    <FontAwesomeIcon icon={faSpinner} className="h-8 w-8 text-own-2" />
-                                </div>
-                                <h3 className="text-xl font-bold text-gray-800 mb-2">Redirecting to Password Reset...</h3>
-                                <p className="text-gray-600">Please wait while we redirect you to set your new password</p>
-                            </div>
-                        )}
                     </motion.div>
 
                     {/* Additional Information */}
@@ -333,7 +374,6 @@ export default function EmailVerification() {
                         <ul className="text-sm text-blue-700 space-y-1">
                             <li>• Check your spam/junk folder for verification emails</li>
                             <li>• Email verification links expire after 24 hours</li>
-                            <li>• Password reset links expire after 1 hour</li>
                             <li>• Try requesting a new email from the login page</li>
                             <li>• Contact support if you continue to have issues</li>
                         </ul>

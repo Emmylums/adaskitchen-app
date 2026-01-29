@@ -30,20 +30,25 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Send email verification - FIXED: Use correct verify-email URL
+  // Send email verification - FIXED
   const sendEmailVerification = async (user) => {
     try {
-      // Get the current origin (localhost:3000 or your domain)
-      const actionUrl = `${window.location.origin}/verify-email`;
-      console.log("Sending verification email with URL:", actionUrl);
+      // Get the current origin
+      const currentOrigin = window.location.origin;
+      const actionUrl = `${currentOrigin}/verify-email`;
+      
+      console.log("📧 Sending verification email to:", user.email);
+      console.log("🔗 Using action URL:", actionUrl);
       
       await firebaseSendEmailVerification(user, {
         url: actionUrl,
         handleCodeInApp: true
       });
+      
+      console.log("✅ Verification email sent successfully");
       return true;
     } catch (error) {
-      console.error("Error sending verification email:", error);
+      console.error("❌ Error sending verification email:", error);
       throw error;
     }
   };
@@ -67,17 +72,18 @@ export const AuthProvider = ({ children }) => {
     try {
       await signOut(auth);
       setUser(null);
-      console.log("User signed out successfully");
+      console.log("✅ User signed out successfully");
     } catch (error) {
       console.error("Logout error:", error);
       throw error;
     }
   };
 
-  // Reset password - FIXED: Use same verify-email URL
+  // Reset password - FIXED
   const resetPassword = (email) => {
     const actionUrl = `${window.location.origin}/verify-email`;
-    console.log("Sending password reset email with URL:", actionUrl);
+    console.log("🔐 Sending password reset email to:", email);
+    console.log("🔗 Using action URL:", actionUrl);
     
     return sendPasswordResetEmail(auth, email, {
       url: actionUrl,
