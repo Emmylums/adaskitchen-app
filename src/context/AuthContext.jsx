@@ -30,11 +30,15 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Send email verification
+  // Send email verification - FIXED: Use correct verify-email URL
   const sendEmailVerification = async (user) => {
     try {
+      // Get the current origin (localhost:3000 or your domain)
+      const actionUrl = `${window.location.origin}/verify-email`;
+      console.log("Sending verification email with URL:", actionUrl);
+      
       await firebaseSendEmailVerification(user, {
-        url: `${window.location.origin}/verify-email`,
+        url: actionUrl,
         handleCodeInApp: true
       });
       return true;
@@ -70,10 +74,13 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Reset password
+  // Reset password - FIXED: Use same verify-email URL
   const resetPassword = (email) => {
+    const actionUrl = `${window.location.origin}/verify-email`;
+    console.log("Sending password reset email with URL:", actionUrl);
+    
     return sendPasswordResetEmail(auth, email, {
-      url: `${window.location.origin}/verify-email`,
+      url: actionUrl,
       handleCodeInApp: true
     });
   };

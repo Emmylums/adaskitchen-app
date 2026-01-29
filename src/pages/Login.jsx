@@ -60,6 +60,7 @@ export default function Login() {
         if (error) setError("");
     };
 
+    // In the resendVerificationEmail function, update it to this:
     const resendVerificationEmail = async (email) => {
         try {
             setResendLoading(true);
@@ -74,9 +75,12 @@ export default function Login() {
             
             const user = userCredential.user;
             
-            // Send verification email
+            // Send verification email with correct URL
+            const actionUrl = `${window.location.origin}/verify-email`;
+            console.log("Resending verification email to:", user.email, "with URL:", actionUrl);
+            
             await firebaseSendEmailVerification(user, {
-                url: `${window.location.origin}/login`,
+                url: actionUrl,
                 handleCodeInApp: true
             });
             
@@ -85,12 +89,21 @@ export default function Login() {
             
             setSuccess(
                 <div className="space-y-2">
-                    <p className="font-semibold text-green-700">✅ Verification email sent!</p>
+                    <p className="font-semibold text-green-700">✅ New verification email sent!</p>
                     <p className="text-sm text-gray-600">
                         Check your inbox (and spam folder) for the verification link.
+                        Click the link to verify your email before logging in.
                     </p>
+                    <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                        <p className="text-xs text-blue-700">
+                            <strong>Note:</strong> The verification link will take you to our verification page.
+                        </p>
+                    </div>
                 </div>
             );
+            
+            // Clear the password field for security
+            setFormData(prev => ({ ...prev, password: "" }));
             
         } catch (err) {
             console.error("Resend verification error:", err);

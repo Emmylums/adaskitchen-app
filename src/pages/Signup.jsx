@@ -13,15 +13,14 @@ import {
   faUser, 
   faPhone, 
   faExclamationTriangle,
-  faCheckCircle,
-  faClock
+  faCheckCircle
 } from "@fortawesome/free-solid-svg-icons";
 import { useAuth } from "../context/AuthContext"; 
 import bg from "../assets/background.jpeg";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import { faGoogle } from "@fortawesome/free-brands-svg-icons";
-import { updateProfile, signOut } from "firebase/auth";
+import { updateProfile, signOut, sendEmailVerification as firebaseSendEmailVerification } from "firebase/auth";
 import { auth } from "../firebaseConfig";
 
 export default function SignUp() {
@@ -32,7 +31,7 @@ export default function SignUp() {
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(null); // null, "verify", or "completed"
     
-    const { signup, signInWithGoogle, user, sendEmailVerification } = useAuth();
+    const { signup, signInWithGoogle, user } = useAuth();
     const navigate = useNavigate();
 
     const [formData, setFormData] = useState({
@@ -85,8 +84,14 @@ export default function SignUp() {
                 displayName: `${formData.firstName} ${formData.lastName}`
             });
 
-            // 3. Send email verification
-            await sendEmailVerification(firebaseUser);
+            // 3. Send email verification with proper URL
+            const actionUrl = `${window.location.origin}/verify-email`;
+            console.log("Sending verification email to:", firebaseUser.email, "with URL:", actionUrl);
+            
+            await firebaseSendEmailVerification(firebaseUser, {
+                url: actionUrl,
+                handleCodeInApp: true
+            });
 
             // 4. Create user document in Firestore
             const userRef = doc(db, "users", firebaseUser.uid);
@@ -164,7 +169,7 @@ export default function SignUp() {
                 id: notificationId,
                 type: "verification",
                 title: "Verify Your Email",
-                message: "Please check your email to verify your account. You must verify before logging in.",
+                message: `Please check your email (${formData.email}) to verify your account. You must verify before logging in.`,
                 read: false,
                 createdAt: new Date().toISOString(),
                 actionUrl: "/login",
@@ -317,7 +322,11 @@ export default function SignUp() {
         
         try {
             setLoading(true);
-            await sendEmailVerification(user);
+            const actionUrl = `${window.location.origin}/verify-email`;
+            await firebaseSendEmailVerification(user, {
+                url: actionUrl,
+                handleCodeInApp: true
+            });
             setSuccess("verify");
             setError("");
         } catch (err) {
@@ -367,40 +376,53 @@ export default function SignUp() {
                                     />
                                 </div>
                                 <h3 className="text-xl font-bold text-blue-700 mb-3 text-center">
-                                    Verify Your Email Address
+                                    Check Your Email to Verify!
                                 </h3>
                                 <div className="space-y-3 text-center">
                                     <p className="text-blue-600">
                                         We've sent a verification email to: <br/>
-                                        <span className="font-semibold">{formData.email}</span>
+                                        <span className="font-semibold text-lg">{formData.email}</span>
                                     </p>
                                     <p className="text-sm text-gray-600">
                                         Please check your inbox and click the verification link to activate your account.
                                     </p>
                                     <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-4 mt-4">
-                                        <p className="text-sm text-yellow-700 mb-2">
-                                            <FontAwesomeIcon icon={faExclamationTriangle} className="mr-2" />
-                                            <strong>Important:</strong> You must verify your email before you can log in.
-                                        </p>
-                                        <ul className="text-xs text-yellow-600 space-y-1 pl-5 list-disc">
-                                            <li>Check your spam/junk folder if you don't see the email</li>
-                                            <li>The verification link expires in 24 hours</li>
-                                            <li>Can't find the email? Try the login page to resend verification</li>
-                                        </ul>
+                                        <div className="flex items-start">
+                                            <FontAwesomeIcon icon={faExclamationTriangle} className="h-5 w-5 text-yellow-500 mr-2 mt-0.5 flex-shrink-0" />
+                                            <div>
+                                                <p className="text-sm font-medium text-yellow-700 mb-2">
+                                                    Important Verification Instructions:
+                                                </p>
+                                                <ul className="text-xs text-yellow-600 space-y-1">
+                                                    <li>• Click the verification link in the email sent to {formData.email}</li>
+                                                    <li>• Check your spam/junk folder if you don't see the email</li>
+                                                    <li>• The verification link expires in 24 hours</li>
+                                                    <li>• You must verify your email before you can log in</li>
+                                                </ul>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div className="pt-4 space-y-3">
                                         <Link 
                                             to="/login" 
-                                            className="inline-block w-full bg-own-2 text-white px-6 py-3 rounded-xl hover:bg-amber-600 transition-colors"
+                                            className="block w-full text-center bg-own-2 text-white px-6 py-3 rounded-xl hover:bg-amber-600 transition-colors font-medium"
                                         >
                                             Go to Login
                                         </Link>
                                         <button
                                             onClick={handleResendVerification}
                                             disabled={loading}
-                                            className="inline-block w-full bg-gray-100 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50"
+                                            className="block w-full text-center bg-gray-100 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50 font-medium"
                                         >
-                                            {loading ? "Sending..." : "Resend Verification Email"}
+                                            {loading ? (
+                                                <>
+                                                    <svg className="animate-spin inline-block h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                    </svg>
+                                                    Sending...
+                                                </>
+                                            ) : "Resend Verification Email"}
                                         </button>
                                     </div>
                                 </div>
@@ -427,9 +449,12 @@ export default function SignUp() {
                         {/* Error Message */}
                         {error && (
                             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
-                                <p className="text-red-700 text-center font-medium">
-                                    ❌ {error}
-                                </p>
+                                <div className="flex items-start">
+                                    <FontAwesomeIcon icon={faExclamationTriangle} className="h-5 w-5 text-red-500 mr-3 mt-0.5 flex-shrink-0" />
+                                    <p className="text-red-700 font-medium">
+                                        {error}
+                                    </p>
+                                </div>
                             </div>
                         )}
 
@@ -456,7 +481,7 @@ export default function SignUp() {
                                                     value={formData.firstName}
                                                     onChange={handleInputChange}
                                                     disabled={loading}
-                                                    className="block w-full pl-10 pr-3 py-4 border border-gray-300 rounded-xl placeholder-gray-400 focus:ring-2 focus:ring-own-2 focus:border-own-2 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                                    className="block w-full pl-10 pr-3 py-4 border border-gray-300 rounded-xl placeholder-gray-400 focus:ring-2 focus:ring-own-2 focus:border-own-2 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed text-black"
                                                     placeholder="First name"
                                                 />
                                             </div>
@@ -479,7 +504,7 @@ export default function SignUp() {
                                                     value={formData.lastName}
                                                     onChange={handleInputChange}
                                                     disabled={loading}
-                                                    className="block w-full pl-10 pr-3 py-4 border border-gray-300 rounded-xl placeholder-gray-400 focus:ring-2 focus:ring-own-2 focus:border-own-2 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                                    className="block w-full pl-10 pr-3 py-4 border border-gray-300 rounded-xl placeholder-gray-400 focus:ring-2 focus:ring-own-2 focus:border-own-2 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed text-black"
                                                     placeholder="Last name"
                                                 />
                                             </div>
@@ -504,7 +529,7 @@ export default function SignUp() {
                                                 value={formData.email}
                                                 onChange={handleInputChange}
                                                 disabled={loading}
-                                                className="block w-full pl-10 pr-3 py-4 border border-gray-300 rounded-xl placeholder-gray-400 focus:ring-2 focus:ring-own-2 focus:border-own-2 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                                className="block w-full pl-10 pr-3 py-4 border border-gray-300 rounded-xl placeholder-gray-400 focus:ring-2 focus:ring-own-2 focus:border-own-2 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed text-black"
                                                 placeholder="Enter your email"
                                             />
                                         </div>
@@ -528,7 +553,7 @@ export default function SignUp() {
                                                 value={formData.phone}
                                                 onChange={handleInputChange}
                                                 disabled={loading}
-                                                className="block w-full pl-10 pr-3 py-4 border border-gray-300 rounded-xl placeholder-gray-400 focus:ring-2 focus:ring-own-2 focus:border-own-2 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                                className="block w-full pl-10 pr-3 py-4 border border-gray-300 rounded-xl placeholder-gray-400 focus:ring-2 focus:ring-own-2 focus:border-own-2 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed text-black"
                                                 placeholder="Enter your phone number"
                                             />
                                         </div>
@@ -649,16 +674,16 @@ export default function SignUp() {
                                     <button
                                         type="submit"
                                         disabled={!formData.acceptTerms || loading}
-                                        className="w-full py-4 px-4 border border-transparent rounded-xl shadow-sm text-sm font-bold text-white bg-own-2 hover:bg-amber-600 disabled:bg-gray-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-own-2 transition-colors flex justify-center items-center"
+                                        className="w-full py-4 px-4 border border-transparent rounded-xl shadow-sm text-sm font-bold text-white bg-own-2 hover:bg-amber-600 disabled:bg-gray-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-own-2 transition-all duration-300 transform hover:scale-[1.02] active:scale-95"
                                     >
                                         {loading ? (
-                                            <>
-                                                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <div className="flex items-center justify-center">
+                                                <svg className="animate-spin h-5 w-5 mr-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                                 </svg>
                                                 Creating Account...
-                                            </>
+                                            </div>
                                         ) : (
                                             "Create Account"
                                         )}
@@ -681,7 +706,7 @@ export default function SignUp() {
                                             type="button"
                                             onClick={handleGoogleSignUp}
                                             disabled={loading}
-                                            className="w-full inline-flex justify-center items-center py-3 px-4 border border-gray-300 rounded-xl shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="w-full inline-flex justify-center items-center py-3 px-4 border border-gray-300 rounded-xl shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all duration-300 transform hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             <FontAwesomeIcon icon={faGoogle} className="h-5 w-5 mr-3 text-red-500" />
                                             <span>Continue with Google</span>
