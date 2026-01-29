@@ -12,12 +12,14 @@ import {
   faEnvelope, 
   faSpinner,
   faArrowRight,
-  faExclamationTriangle
+  faExclamationTriangle,
+  faKey
 } from "@fortawesome/free-solid-svg-icons";
 import { 
   applyActionCode, 
   checkActionCode, 
-  verifyPasswordResetCode 
+  verifyPasswordResetCode,
+  confirmPasswordReset
 } from "firebase/auth";
 import { auth } from "../firebaseConfig";
 import { doc, updateDoc } from "firebase/firestore";
@@ -37,10 +39,14 @@ export default function EmailVerification() {
     useEffect(() => {
         const code = searchParams.get("oobCode");
         const modeParam = searchParams.get("mode");
+        const apiKey = searchParams.get("apiKey");
+        const lang = searchParams.get("lang") || "en";
         
         console.log("EmailVerification component loaded with params:", {
             oobCode: code,
             mode: modeParam,
+            apiKey: apiKey,
+            lang: lang,
             allParams: Object.fromEntries(searchParams.entries())
         });
         
@@ -67,35 +73,50 @@ export default function EmailVerification() {
                 // Get email from action code
                 const info = await checkActionCode(auth, code);
                 console.log("Action code info retrieved:", info.data.email);
-                setEmail(info.data.email);
+                const userEmail = info.data.email;
+                setEmail(userEmail);
                 
-                // Update Firestore to mark email as verified
-                if (auth.currentUser) {
-                    const userRef = doc(db, "users", auth.currentUser.uid);
+                // Try to update Firestore to mark email as verified
+                try {
+                    // We need to find the user by email since we might not have currentUser
+                    const userRef = doc(db, "users", info.data.uid || "unknown");
                     await updateDoc(userRef, {
                         emailVerified: true,
                         updatedAt: new Date().toISOString()
                     });
-                    console.log("Firestore updated for user:", auth.currentUser.uid);
+                    console.log("Firestore updated for user:", info.data.uid);
+                } catch (firestoreError) {
+                    console.warn("Could not update Firestore, but email verification succeeded:", firestoreError);
+                    // Continue even if Firestore update fails
                 }
                 
                 setVerified(true);
                 console.log("Email verification successful!");
                 
             } else if (mode === "resetPassword") {
-                // For password reset - just verify the code is valid
+                // For password reset - verify the code is valid without applying it
                 console.log("Handling password reset verification...");
-                await verifyPasswordResetCode(auth, code);
-                const info = await checkActionCode(auth, code);
-                setEmail(info.data.email);
+                
+                // IMPORTANT: Use verifyPasswordResetCode to check if code is valid
+                // but DON'T apply it yet - that happens on the reset password page
+                const verifiedEmail = await verifyPasswordResetCode(auth, code);
+                console.log("Password reset code verified for email:", verifiedEmail);
+                setEmail(verifiedEmail);
+                
+                // Store the reset code in sessionStorage for the reset password page
+                sessionStorage.setItem('resetPasswordCode', code);
+                sessionStorage.setItem('resetPasswordEmail', verifiedEmail);
+                
                 setVerified(true);
                 console.log("Password reset code verified, navigating to reset-password");
-                // Navigate to reset password page with the code
-                navigate(`/reset-password?oobCode=${code}`);
+                
+                // Navigate to reset password page
+                navigate(`/reset-password?oobCode=${encodeURIComponent(code)}&email=${encodeURIComponent(verifiedEmail)}`);
                 return;
+                
             } else {
                 console.error("Invalid mode parameter:", mode);
-                setError("Invalid action mode.");
+                setError(`Invalid action mode: ${mode}`);
             }
         } catch (err) {
             console.error("Action code error details:", {
@@ -103,24 +124,36 @@ export default function EmailVerification() {
                 message: err.message,
                 fullError: err
             });
-            switch (err.code) {
-                case "auth/expired-action-code":
-                    setError("This verification link has expired. Please request a new one.");
-                    break;
-                case "auth/invalid-action-code":
-                    setError("Invalid verification link. Please request a new one.");
-                    break;
-                case "auth/user-disabled":
-                    setError("This account has been disabled.");
-                    break;
-                case "auth/user-not-found":
-                    setError("No account found with this email.");
-                    break;
-                default:
-                    setError(`Failed to verify email. Error: ${err.message || "Please try again."}`);
+            
+            // More specific error handling
+            if (err.code === "auth/expired-action-code") {
+                setError("This verification link has expired. Please request a new one.");
+            } else if (err.code === "auth/invalid-action-code") {
+                setError("Invalid verification link. The link may have already been used or is malformed.");
+            } else if (err.code === "auth/user-disabled") {
+                setError("This account has been disabled. Please contact support.");
+            } else if (err.code === "auth/user-not-found") {
+                setError("No account found with this email address.");
+            } else if (err.code === "auth/argument-error") {
+                setError("Invalid verification link format. Please check the link and try again.");
+            } else if (err.message?.includes("resetPassword")) {
+                setError("This password reset link is invalid or has expired. Please request a new password reset email.");
+            } else {
+                setError(`Failed to process verification: ${err.message || "Please try again."}`);
             }
         } finally {
             setVerifying(false);
+        }
+    };
+
+    // Handle reset password separately if needed
+    const handlePasswordReset = async (code, newPassword) => {
+        try {
+            await confirmPasswordReset(auth, code, newPassword);
+            return true;
+        } catch (error) {
+            console.error("Password reset error:", error);
+            throw error;
         }
     };
 
@@ -136,7 +169,7 @@ export default function EmailVerification() {
                     <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1.0 }}>
                         <div className="p-10 text-center text-white mt-10">
                             <h2 className="font-display tracking-widest font-black text-4xl drop-shadow-lg">
-                                {mode === "verifyEmail" ? "Email Verification" : "Reset Password"}
+                                {mode === "verifyEmail" ? "Email Verification" : "Password Reset"}
                             </h2>
                         </div>
                     </motion.div>
@@ -157,11 +190,17 @@ export default function EmailVerification() {
                                 <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-own-2 mx-auto mb-4 flex items-center justify-center">
                                     <FontAwesomeIcon icon={faSpinner} className="h-8 w-8 text-own-2" />
                                 </div>
-                                <h3 className="text-xl font-bold text-gray-800 mb-2">Verifying Your Email...</h3>
-                                <p className="text-gray-600">Please wait while we verify your email address</p>
-                                <div className="mt-4 text-xs text-gray-500">
-                                    <p>Mode: {mode || "Loading..."}</p>
-                                    <p>Code: {oobCode ? `${oobCode.substring(0, 10)}...` : "No code"}</p>
+                                <h3 className="text-xl font-bold text-gray-800 mb-2">
+                                    {mode === "verifyEmail" ? "Verifying Your Email..." : "Processing Password Reset..."}
+                                </h3>
+                                <p className="text-gray-600">
+                                    {mode === "verifyEmail" 
+                                        ? "Please wait while we verify your email address" 
+                                        : "Please wait while we process your password reset request"}
+                                </p>
+                                <div className="mt-4 text-xs text-gray-500 space-y-1">
+                                    <p>Mode: <span className="font-medium">{mode || "Loading..."}</span></p>
+                                    <p>Code: <span className="font-mono">{oobCode ? `${oobCode.substring(0, 15)}...` : "No code"}</span></p>
                                 </div>
                             </div>
                         ) : error ? (
@@ -169,21 +208,39 @@ export default function EmailVerification() {
                                 <div className="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
                                     <FontAwesomeIcon icon={faExclamationCircle} className="h-8 w-8 text-red-500" />
                                 </div>
-                                <h3 className="text-xl font-bold text-gray-800 mb-2">Verification Failed</h3>
-                                <p className="text-red-600 mb-4">{error}</p>
+                                <h3 className="text-xl font-bold text-gray-800 mb-2">
+                                    {mode === "verifyEmail" ? "Verification Failed" : "Password Reset Failed"}
+                                </h3>
+                                <p className="text-red-600 mb-4 px-4">{error}</p>
+                                
                                 <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
                                     <div className="flex items-start">
                                         <FontAwesomeIcon icon={faExclamationTriangle} className="h-5 w-5 text-yellow-500 mr-2 mt-0.5 flex-shrink-0" />
                                         <div>
-                                            <p className="text-sm font-medium text-yellow-700 mb-1">Troubleshooting Tips:</p>
+                                            <p className="text-sm font-medium text-yellow-700 mb-1">
+                                                {mode === "verifyEmail" ? "Troubleshooting Tips:" : "What to do next:"}
+                                            </p>
                                             <ul className="text-xs text-yellow-600 space-y-1">
-                                                <li>• Make sure you're clicking the link from the same device/browser where you requested verification</li>
-                                                <li>• Verification links expire after 24 hours</li>
-                                                <li>• Try requesting a new verification email from the login page</li>
+                                                {mode === "verifyEmail" ? (
+                                                    <>
+                                                        <li>• Make sure you're clicking the link from the same device/browser where you requested verification</li>
+                                                        <li>• Verification links expire after 24 hours</li>
+                                                        <li>• Try requesting a new verification email from the login page</li>
+                                                        <li>• Check that you haven't already verified this email</li>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <li>• Password reset links expire after 1 hour</li>
+                                                        <li>• Request a new password reset link from the login page</li>
+                                                        <li>• Make sure you're using the exact link from the email</li>
+                                                        <li>• Try copying and pasting the link instead of clicking it</li>
+                                                    </>
+                                                )}
                                             </ul>
                                         </div>
                                     </div>
                                 </div>
+                                
                                 <div className="space-y-3">
                                     {mode === "verifyEmail" ? (
                                         <>
@@ -191,24 +248,34 @@ export default function EmailVerification() {
                                                 to="/login" 
                                                 className="inline-flex items-center justify-center w-full py-3 px-4 bg-own-2 text-white font-medium rounded-xl hover:bg-amber-600 transition-colors"
                                             >
+                                                <FontAwesomeIcon icon={faArrowRight} className="mr-2 h-4 w-4 rotate-180" />
                                                 Go to Login
-                                                <FontAwesomeIcon icon={faArrowRight} className="ml-2 h-4 w-4" />
                                             </Link>
                                             <Link 
-                                                to="/" 
-                                                className="inline-block w-full py-3 px-4 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors"
+                                                to="/forgot-password" 
+                                                className="inline-flex items-center justify-center w-full py-3 px-4 border border-own-2 text-own-2 font-medium rounded-xl hover:bg-own-2 hover:text-white transition-colors"
                                             >
-                                                Return to Home
+                                                <FontAwesomeIcon icon={faKey} className="mr-2 h-4 w-4" />
+                                                Reset Password
                                             </Link>
                                         </>
                                     ) : (
-                                        <Link 
-                                            to="/forgot-password" 
-                                            className="inline-flex items-center justify-center w-full py-3 px-4 bg-own-2 text-white font-medium rounded-xl hover:bg-amber-600 transition-colors"
-                                        >
-                                            Request New Reset Link
-                                            <FontAwesomeIcon icon={faArrowRight} className="ml-2 h-4 w-4" />
-                                        </Link>
+                                        <>
+                                            <Link 
+                                                to="/forgot-password" 
+                                                className="inline-flex items-center justify-center w-full py-3 px-4 bg-own-2 text-white font-medium rounded-xl hover:bg-amber-600 transition-colors"
+                                            >
+                                                <FontAwesomeIcon icon={faKey} className="mr-2 h-4 w-4" />
+                                                Request New Reset Link
+                                            </Link>
+                                            <Link 
+                                                to="/login" 
+                                                className="inline-flex items-center justify-center w-full py-3 px-4 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors"
+                                            >
+                                                <FontAwesomeIcon icon={faArrowRight} className="mr-2 h-4 w-4 rotate-180" />
+                                                Back to Login
+                                            </Link>
+                                        </>
                                     )}
                                 </div>
                             </div>
@@ -244,6 +311,17 @@ export default function EmailVerification() {
                                 </div>
                             </div>
                         ) : null}
+                        
+                        {/* Show loading if navigating away for password reset */}
+                        {mode === "resetPassword" && verifying === false && error === "" && !verified && (
+                            <div className="py-12">
+                                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-own-2 mx-auto mb-4 flex items-center justify-center">
+                                    <FontAwesomeIcon icon={faSpinner} className="h-8 w-8 text-own-2" />
+                                </div>
+                                <h3 className="text-xl font-bold text-gray-800 mb-2">Redirecting to Password Reset...</h3>
+                                <p className="text-gray-600">Please wait while we redirect you to set your new password</p>
+                            </div>
+                        )}
                     </motion.div>
 
                     {/* Additional Information */}
@@ -254,8 +332,9 @@ export default function EmailVerification() {
                         </h4>
                         <ul className="text-sm text-blue-700 space-y-1">
                             <li>• Check your spam/junk folder for verification emails</li>
-                            <li>• Verification links expire after 24 hours</li>
-                            <li>• Try requesting a new verification email from the login page</li>
+                            <li>• Email verification links expire after 24 hours</li>
+                            <li>• Password reset links expire after 1 hour</li>
+                            <li>• Try requesting a new email from the login page</li>
                             <li>• Contact support if you continue to have issues</li>
                         </ul>
                     </div>
