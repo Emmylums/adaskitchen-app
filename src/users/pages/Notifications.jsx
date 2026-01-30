@@ -12,8 +12,10 @@ import {
   doc, 
   updateDoc,
   getDoc,
+  deleteDoc,
   Timestamp,
-  onSnapshot
+  onSnapshot,
+  writeBatch
 } from "firebase/firestore";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { 
@@ -42,6 +44,8 @@ export default function Notifications() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [deleting, setDeleting] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
   
   const { user } = useAuth();
   const { userData, loading: userLoading } = useUserData();
@@ -420,49 +424,128 @@ export default function Notifications() {
     }
   };
 
+  // Function to delete notification from Firestore
+  const deleteNotificationFromFirestore = async (notificationId, source) => {
+    if (!user) return false;
+    
+    try {
+      if (source === 'subcollection') {
+        // Delete from notifications subcollection
+        const notificationDocRef = doc(db, "users", user.uid, "notifications", notificationId);
+        await deleteDoc(notificationDocRef);
+        return true;
+      } else if (source === 'user-doc') {
+        // Remove from user document array
+        const userDocRef = doc(db, "users", user.uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          const userNotifications = data.notifications || [];
+          
+          const updatedNotifications = userNotifications.filter(notif => notif.id !== notificationId);
+          
+          await updateDoc(userDocRef, {
+            notifications: updatedNotifications
+          });
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+      console.error("Error deleting notification from Firestore:", error);
+      return false;
+    }
+  };
+
   // Function to delete notification
   const deleteNotification = async (notificationId) => {
     if (!window.confirm("Are you sure you want to delete this notification?")) {
       return;
     }
     
+    setDeleting(true);
     try {
-      // Try to delete from subcollection
-      try {
-        // Note: In a real app, you would delete from Firestore
-        // For now, we'll just update local state
-      } catch (error) {
-        // Silently fail
+      // Find the notification to get its source
+      const notification = notifications.find(n => n.id === notificationId);
+      if (!notification) {
+        setDeleting(false);
+        return;
       }
       
+      // Try to delete from Firestore
+      const firestoreDeleted = await deleteNotificationFromFirestore(notificationId, notification.source);
+      
       // Check if notification was unread to update count
-      const notification = notifications.find(n => n.id === notificationId);
       if (notification && !notification.read) {
         setUnreadCount(prev => Math.max(0, prev - 1));
       }
       
-      // Update local state
+      // Update local state regardless of Firestore success
       setNotifications(prev => prev.filter(notif => notif.id !== notificationId));
+      
+      if (!firestoreDeleted) {
+        console.warn("Notification deleted locally but not from Firestore");
+      }
       
     } catch (error) {
       console.error("Error deleting notification:", error);
+      // Still update local state on error
+      const notification = notifications.find(n => n.id === notificationId);
+      if (notification && !notification.read) {
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+      setNotifications(prev => prev.filter(notif => notif.id !== notificationId));
+    } finally {
+      setDeleting(false);
     }
   };
 
   // Function to clear all notifications
   const clearAllNotifications = async () => {
-    if (!window.confirm("Are you sure you want to clear all notifications?")) {
+    if (!window.confirm("Are you sure you want to delete all notifications? This action cannot be undone.")) {
       return;
     }
     
+    setDeletingAll(true);
     try {
-      // In a real app, you would delete from Firestore
-      // For now, just update local state
+      if (!user) {
+        setNotifications([]);
+        setUnreadCount(0);
+        setDeletingAll(false);
+        return;
+      }
+      
+      // Use a batch to delete all notifications from subcollection
+      const batch = writeBatch(db);
+      const notificationsRef = collection(db, "users", user.uid, "notifications");
+      const querySnapshot = await getDocs(notificationsRef);
+      
+      // Delete all documents from subcollection
+      querySnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+      
+      // Also clear from user document array (for backward compatibility)
+      const userDocRef = doc(db, "users", user.uid);
+      batch.update(userDocRef, {
+        notifications: []
+      });
+      
+      // Commit the batch
+      await batch.commit();
+      
+      // Update local state
       setNotifications([]);
       setUnreadCount(0);
       
     } catch (error) {
-      console.error("Error clearing notifications:", error);
+      console.error("Error clearing all notifications:", error);
+      // Fallback: update local state only
+      setNotifications([]);
+      setUnreadCount(0);
+    } finally {
+      setDeletingAll(false);
     }
   };
 
@@ -506,7 +589,7 @@ export default function Notifications() {
       <UserNavBar 
         toggleSidebar={toggleSidebars} 
         isSideBarOpen={isSidebarOpen}
-        user={userData}
+        userData={userData}
       />
       <UserSideBar 
         isOpen={isSidebarOpen} 
@@ -515,8 +598,8 @@ export default function Notifications() {
         setActiveTab={setActiveTab} 
         activeTab={activeTab}
       />
-      <div className="md:flex md:justify-end">
-        <div className={`pt-32 px-5 ${isSidebarOpen ? "md:w-[70%] lg:w-[75%]" : "md:w-full"} transition-all duration-500`}>
+      <div className="lg:flex lg:justify-end">
+        <div className={`pt-32 px-5 ${isSidebarOpen ? "lg:w-[75%]" : "lg:w-full"} transition-all duration-500`}>
           <div className="max-w-7xl mx-auto pb-12 sm:px-6 lg:px-8">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Main Content */}
@@ -541,7 +624,8 @@ export default function Notifications() {
                       {unreadCount > 0 && (
                         <button 
                           onClick={markAllAsRead}
-                          className="px-4 py-2 text-sm bg-own-2 text-white rounded-xl hover:bg-amber-600 transition-colors flex items-center gap-2"
+                          disabled={loading}
+                          className="px-4 py-2 text-sm bg-own-2 text-white rounded-xl hover:bg-amber-600 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <FontAwesomeIcon icon={faCheck} />
                           Mark all as read
@@ -551,10 +635,23 @@ export default function Notifications() {
                       {notifications.length > 0 && (
                         <button 
                           onClick={clearAllNotifications}
-                          className="px-4 py-2 text-sm border border-red-300 text-red-600 rounded-xl hover:bg-red-50 transition-colors flex items-center gap-2"
+                          disabled={deletingAll || loading}
+                          className="px-4 py-2 text-sm border border-red-300 text-red-600 rounded-xl hover:bg-red-50 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <FontAwesomeIcon icon={faTrash} />
-                          Clear all
+                          {deletingAll ? (
+                            <>
+                              <svg className="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Deleting...
+                            </>
+                          ) : (
+                            <>
+                              <FontAwesomeIcon icon={faTrash} />
+                              Delete all
+                            </>
+                          )}
                         </button>
                       )}
                     </div>
@@ -625,9 +722,17 @@ export default function Notifications() {
                                   
                                   <button 
                                     onClick={() => deleteNotification(notification.id)}
-                                    className="text-sm text-gray-500 hover:text-red-600 flex items-center gap-1"
+                                    disabled={deleting}
+                                    className="text-sm text-gray-500 hover:text-red-600 flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                                   >
-                                    <FontAwesomeIcon icon={faTrash} className="text-xs" />
+                                    {deleting ? (
+                                      <svg className="animate-spin h-3 w-3 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                      </svg>
+                                    ) : (
+                                      <FontAwesomeIcon icon={faTrash} className="text-xs" />
+                                    )}
                                     Delete
                                   </button>
                                 </div>

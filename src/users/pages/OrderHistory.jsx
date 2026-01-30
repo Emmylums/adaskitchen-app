@@ -342,7 +342,7 @@ export default function OrderHistory() {
       <UserNavBar 
         toggleSidebar={toggleSidebars} 
         isSideBarOpen={isSidebarOpen}
-        user={userData}
+        userData={userData}
       />
       <UserSideBar 
         isOpen={isSidebarOpen} 
@@ -351,8 +351,8 @@ export default function OrderHistory() {
         setActiveTab={setActiveTab} 
         activeTab={activeTab}
       />
-      <div className="md:flex md:justify-end">
-        <div className={`pt-32 px-5 ${isSidebarOpen ? "md:w-[70%] lg:w-[75%]" : "md:w-full"} transition-all duration-500`}>
+      <div className="lg:flex lg:justify-end">
+        <div className={`pt-32 px-5 ${isSidebarOpen ? "lg:w-[75%]" : "lg:w-full"} transition-all duration-500`}>
           {activeTab === "Orders" && (
             <div className="bg-white rounded-2xl shadow-lg p-6 text-black">
               <div className="flex justify-between items-center mb-6">

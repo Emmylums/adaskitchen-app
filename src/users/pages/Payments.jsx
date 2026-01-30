@@ -18,7 +18,13 @@ import {
 import UserNavBar from "../components/UserNavbar";
 import UserSideBar from "../components/UserSidebar";
 import { useUserData } from "../hooks/useUserData";
-import { CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { 
+  CardNumberElement, 
+  CardExpiryElement, 
+  CardCvcElement, 
+  useStripe, 
+  useElements 
+} from "@stripe/react-stripe-js";
 import { 
   doc, 
   onSnapshot, 
@@ -28,6 +34,69 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebaseConfig";
 import { createNotification, NotificationTemplates } from "../services/notificationService";
+
+// Card type detection utility (for display purposes)
+const getCardType = (number) => {
+  const cleanNumber = number.replace(/\D/g, '');
+  
+  if (!cleanNumber) return null;
+  
+  if (/^4/.test(cleanNumber)) return {
+    type: 'visa',
+    name: 'Visa',
+    color: 'bg-blue-500',
+    textColor: 'text-blue-500'
+  };
+  
+  if (/^5[1-5]/.test(cleanNumber) || /^2[2-7]/.test(cleanNumber)) return {
+    type: 'mastercard',
+    name: 'Mastercard',
+    color: 'bg-red-500',
+    textColor: 'text-red-500'
+  };
+  
+  if (/^3[47]/.test(cleanNumber)) return {
+    type: 'amex',
+    name: 'American Express',
+    color: 'bg-green-500',
+    textColor: 'text-green-500'
+  };
+  
+  if (/^6(?:011|5)/.test(cleanNumber)) return {
+    type: 'discover',
+    name: 'Discover',
+    color: 'bg-orange-500',
+    textColor: 'text-orange-500'
+  };
+  
+  if (/^3(?:0[0-5]|[68])/.test(cleanNumber)) return {
+    type: 'diners',
+    name: 'Diners Club',
+    color: 'bg-purple-500',
+    textColor: 'text-purple-500'
+  };
+  
+  if (/^35/.test(cleanNumber)) return {
+    type: 'jcb',
+    name: 'JCB',
+    color: 'bg-pink-500',
+    textColor: 'text-pink-500'
+  };
+  
+  if (/^62/.test(cleanNumber)) return {
+    type: 'unionpay',
+    name: 'UnionPay',
+    color: 'bg-cyan-500',
+    textColor: 'text-cyan-500'
+  };
+  
+  return {
+    type: 'unknown',
+    name: 'Card',
+    color: 'bg-gray-500',
+    textColor: 'text-gray-500'
+  };
+};
 
 export default function Payments() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -57,6 +126,19 @@ export default function Payments() {
   const [paymentIntentId, setPaymentIntentId] = useState(null);
   const [walletTransactions, setWalletTransactions] = useState([]);
   const [showTransactions, setShowTransactions] = useState(false);
+  
+  // Card form states for Add Payment Method
+  const [cardHolderName, setCardHolderName] = useState("");
+  const [detectedCardType, setDetectedCardType] = useState(null);
+  
+  // Card form states for Add Money with new card
+  const [newCardForMoneyHolderName, setNewCardForMoneyHolderName] = useState("");
+  const [detectedCardTypeForMoney, setDetectedCardTypeForMoney] = useState(null);
+  const [cardElementComplete, setCardElementComplete] = useState({
+    cardNumber: false,
+    cardExpiry: false,
+    cardCvc: false
+  });
   
   const { userData, loading: userLoading } = useUserData();
 
@@ -105,6 +187,34 @@ export default function Payments() {
     return () => unsubscribe();
   }, [userData?.uid]);
 
+  // Clear card form for Add Payment Method
+  const clearCardForm = () => {
+    setCardHolderName("");
+    setDetectedCardType(null);
+    
+    // Clear Stripe elements
+    if (elements) {
+      const cardNumberElement = elements.getElement(CardNumberElement);
+      const cardExpiryElement = elements.getElement(CardExpiryElement);
+      const cardCvcElement = elements.getElement(CardCvcElement);
+      
+      if (cardNumberElement) cardNumberElement.clear();
+      if (cardExpiryElement) cardExpiryElement.clear();
+      if (cardCvcElement) cardCvcElement.clear();
+    }
+  };
+
+  // Clear card form for Add Money with new card
+  const clearNewCardForMoneyForm = () => {
+    setNewCardForMoneyHolderName("");
+    setDetectedCardTypeForMoney(null);
+    setCardElementComplete({
+      cardNumber: false,
+      cardExpiry: false,
+      cardCvc: false
+    });
+  };
+
   // Predefined amounts for quick selection (in pence)
   const quickAmounts = [500, 1000, 2000, 5000, 10000, 20000];
 
@@ -132,123 +242,197 @@ export default function Payments() {
   };
 
   // Handle add money with card payment
-  // Handle add money with card payment
-const handleAddMoney = async () => {
-  if (!amount || isNaN(amount) || Number(amount) <= 0) {
-    setAlert({
-      message: "Please enter a valid amount",
-      type: "error"
-    });
-    return;
-  }
-
-  const amountInPence = Math.round(Number(amount) * 100);
-  
-  // Check if using saved card or new card
-  if (!useNewCard && !selectedPaymentMethod && savedCards.length > 0) {
-    setAlert({
-      message: "Please select a payment method",
-      type: "error"
-    });
-    return;
-  }
-
-  if (useNewCard && !elements) {
-    setAlert({
-      message: "Please enter card details",
-      type: "error"
-    });
-    return;
-  }
-
-  try {
-    setIsProcessing(true);
-    setAlert(null);
-
-    const paymentIntentData = {
-      amount: amountInPence,
-      userId: userData.uid,
-      currency: "gbp",
-      saveCard: saveNewCard  // Include saveCard flag
-    };
-
-    if (!useNewCard && selectedPaymentMethod) {
-      // For saved card
-      paymentIntentData.paymentMethodId = selectedPaymentMethod;
-    } else if (useNewCard && elements) {
-      // For new card - we'll handle the payment method separately
-      // We don't include paymentMethodId here, Stripe will create one
-    }
-
-    console.log("Sending wallet top-up request:", paymentIntentData);
-
-    // CORRECTED: Use add-money-to-wallet endpoint for wallet top-ups
-    const response = await fetch(
-      `${import.meta.env.VITE_API_URL || "https://adaskitchen-backend.vercel.app/api"}/payments/add-money-to-wallet`,
-      {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
-        body: JSON.stringify(paymentIntentData)
-      }
-    );
-    
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || "Payment failed");
-    }
-
-    // If payment requires confirmation (new card), handle it
-    if (data.requiresConfirmation) {
-      setClientSecret(data.clientSecret);
-      setPaymentIntentId(data.paymentIntentId);
-      setRequiresConfirmation(true);
+  const handleAddMoney = async () => {
+    if (!amount || isNaN(amount) || Number(amount) <= 0) {
+      setAlert({
+        message: "Please enter a valid amount",
+        type: "error"
+      });
       return;
     }
 
-    // If payment succeeded
-    if (data.success) {
-      // Refresh user data manually
-      await refreshUserData();
-
-      // Create wallet top-up notification
-      await createNotification(userData.uid,
-        NotificationTemplates.WALLET_TOPUP(amountInPence, (userData?.walletBalance || 0) + amountInPence)
-      );
-
-      // Show success
+    const amountInPence = Math.round(Number(amount) * 100);
+    
+    // Check if using saved card or new card
+    if (!useNewCard && !selectedPaymentMethod && savedCards.length > 0) {
       setAlert({
-        message: `Successfully added ${formatCurrency(amountInPence)} to your wallet!`,
-        type: "success"
+        message: "Please select a payment method",
+        type: "error"
       });
-
-      // Reset and close modal
-      setTimeout(() => {
-        setAmount("");
-        setSelectedAmount(null);
-        setShowAddMoneyModal(false);
-        setAlert(null);
-        setRequiresConfirmation(false);
-        setClientSecret(null);
-        setPaymentIntentId(null);
-        setUseNewCard(false);
-        setSaveNewCard(false);
-      }, 2000);
+      return;
     }
 
-  } catch (error) {
-    console.error("Error adding money:", error);
-    setAlert({
-      message: error.message || "Failed to add money. Please try again.",
-      type: "error"
-    });
-  } finally {
-    setIsProcessing(false);
-  }
-};
+    // For new card, validate form
+    if (useNewCard) {
+      if (!newCardForMoneyHolderName.trim()) {
+        setAlert({
+          message: "Please enter cardholder name",
+          type: "error"
+        });
+        return;
+      }
+      
+      // Check if all card elements are complete
+      if (!cardElementComplete.cardNumber || !cardElementComplete.cardExpiry || !cardElementComplete.cardCvc) {
+        setAlert({
+          message: "Please complete all card details",
+          type: "error"
+        });
+        return;
+      }
+    }
+
+    try {
+      setIsProcessing(true);
+      setAlert(null);
+
+      const paymentIntentData = {
+        amount: amountInPence,
+        userId: userData.uid,
+        currency: "gbp",
+        saveCard: saveNewCard
+      };
+
+      if (!useNewCard && selectedPaymentMethod) {
+        // For saved card
+        paymentIntentData.paymentMethodId = selectedPaymentMethod;
+        
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL || "https://adaskitchen-backend.vercel.app/api"}/payments/add-money-to-wallet`,
+          {
+            method: "POST",
+            headers: { 
+              "Content-Type": "application/json",
+              "Accept": "application/json"
+            },
+            body: JSON.stringify(paymentIntentData)
+          }
+        );
+        
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Payment failed");
+        }
+
+        // If payment succeeded
+        if (data.success) {
+          // Refresh user data manually
+          await refreshUserData();
+
+          // Create wallet top-up notification
+          await createNotification(userData.uid,
+            NotificationTemplates.WALLET_TOPUP(amountInPence, (userData?.walletBalance || 0) + amountInPence)
+          );
+
+          // Show success
+          setAlert({
+            message: `Successfully added ${formatCurrency(amountInPence)} to your wallet!`,
+            type: "success"
+          });
+
+          // Reset and close modal
+          setTimeout(() => {
+            setAmount("");
+            setSelectedAmount(null);
+            setShowAddMoneyModal(false);
+            setAlert(null);
+            setUseNewCard(false);
+            setSaveNewCard(false);
+            clearNewCardForMoneyForm();
+          }, 2000);
+        }
+      } else if (useNewCard) {
+        // For new card - create payment method first
+        if (!stripe || !elements) {
+          throw new Error("Stripe not loaded. Please refresh the page.");
+        }
+
+        // Create a new payment method with the card details
+        const { paymentMethod, error: createPaymentMethodError } = await stripe.createPaymentMethod({
+          type: 'card',
+          card: elements.getElement(CardNumberElement),
+          billing_details: {
+            name: newCardForMoneyHolderName.trim(),
+            email: userData.email
+          }
+        });
+
+        if (createPaymentMethodError) {
+          throw createPaymentMethodError;
+        }
+
+        // Now create payment intent with the new payment method
+        paymentIntentData.paymentMethodId = paymentMethod.id;
+        
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL || "https://adaskitchen-backend.vercel.app/api"}/payments/add-money-to-wallet`,
+          {
+            method: "POST",
+            headers: { 
+              "Content-Type": "application/json",
+              "Accept": "application/json"
+            },
+            body: JSON.stringify(paymentIntentData)
+          }
+        );
+        
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Payment failed");
+        }
+
+        // If payment requires confirmation (3D Secure), handle it
+        if (data.requiresConfirmation) {
+          setClientSecret(data.clientSecret);
+          setPaymentIntentId(data.paymentIntentId);
+          setRequiresConfirmation(true);
+          return;
+        }
+
+        // If payment succeeded
+        if (data.success) { 
+          // Refresh user data manually
+          await refreshUserData();
+
+          // Create wallet top-up notification
+          await createNotification(userData.uid,
+            NotificationTemplates.WALLET_TOPUP(amountInPence, (userData?.walletBalance || 0) + amountInPence)
+          );
+
+          // Show success
+          setAlert({
+            message: `Successfully added ${formatCurrency(amountInPence)} to your wallet!`,
+            type: "success"
+          });
+
+          // Reset and close modal
+          setTimeout(() => {
+            setAmount("");
+            setSelectedAmount(null);
+            setShowAddMoneyModal(false);
+            setAlert(null);
+            setRequiresConfirmation(false);
+            setClientSecret(null);
+            setPaymentIntentId(null);
+            setUseNewCard(false);
+            setSaveNewCard(false);
+            clearNewCardForMoneyForm();
+          }, 2000);
+        }
+      }
+
+    } catch (error) {
+      console.error("Error adding money:", error);
+      setAlert({
+        message: error.message || "Failed to add money. Please try again.",
+        type: "error"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   // Handle 3D Secure confirmation for new cards
   const handlePaymentConfirmation = async () => {
@@ -288,9 +472,7 @@ const handleAddMoney = async () => {
           setPaymentIntentId(null);
           setUseNewCard(false);
           setSaveNewCard(false);
-          if (elements) {
-            elements.getElement(CardElement).clear();
-          }
+          clearNewCardForMoneyForm();
         }, 2000);
       }
     } catch (error) {
@@ -304,9 +486,18 @@ const handleAddMoney = async () => {
     }
   };
 
-  // Handle adding payment method (separate from wallet top-up)
+  // Handle adding payment method (separate from wallet top-up) - USING STRIPE ELEMENTS
   const handleAddPaymentMethod = async () => {
     if (!stripe || !elements || isSavingCard) return;
+
+    // Validate form
+    if (!cardHolderName.trim()) {
+      setAlert({
+        message: "Please enter cardholder name",
+        type: "error"
+      });
+      return;
+    }
 
     setIsSavingCard(true);
     setAlert(null);
@@ -314,19 +505,19 @@ const handleAddMoney = async () => {
     try {
       // 1. Create setup intent
       const setupIntentResponse = await fetch(
-      `${import.meta.env.VITE_API_URL || "https://adaskitchen-backend.vercel.app/api"}/payments/create-setup-intent`,
-      {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
-        body: JSON.stringify({
-          userId: userData.uid,
-          email: userData.email
-        })
-      }
-    );
+        `${import.meta.env.VITE_API_URL || "https://adaskitchen-backend.vercel.app/api"}/payments/create-setup-intent`,
+        {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
+          body: JSON.stringify({
+            userId: userData.uid,
+            email: userData.email
+          })
+        }
+      );
 
       if (!setupIntentResponse.ok) {
         const errorData = await setupIntentResponse.json();
@@ -335,12 +526,16 @@ const handleAddMoney = async () => {
 
       const { clientSecret } = await setupIntentResponse.json();
 
-      // 2. Confirm card setup
+      // 2. Confirm card setup using Stripe Elements
       const { setupIntent, error } = await stripe.confirmCardSetup(
         clientSecret,
         {
           payment_method: {
-            card: elements.getElement(CardElement),
+            card: elements.getElement(CardNumberElement),
+            billing_details: {
+              name: cardHolderName.trim(),
+              email: userData.email
+            }
           },
         }
       );
@@ -349,7 +544,7 @@ const handleAddMoney = async () => {
 
       // 3. Get payment method details
       const paymentMethodResponse = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/payments/payment-method/${setupIntent.payment_method}`
+        `${import.meta.env.VITE_API_URL || "https://adaskitchen-backend.vercel.app/api"}/payments/payment-method/${setupIntent.payment_method}`
       );
 
       if (!paymentMethodResponse.ok) {
@@ -393,6 +588,7 @@ const handleAddMoney = async () => {
       setTimeout(() => {
         setShowAddPaymentModal(false);
         setAlert(null);
+        clearCardForm();
       }, 2000);
 
     } catch (err) {
@@ -416,8 +612,6 @@ const handleAddMoney = async () => {
     }
 
     try {
-      // Update Stripe
-      // Update the set default card endpoint:
       const response = await fetch(`${import.meta.env.VITE_API_URL || "https://adaskitchen-backend.vercel.app/api"}/payments/set-default-card`, {
         method: "POST",
         headers: { 
@@ -482,8 +676,6 @@ const handleAddMoney = async () => {
     }
 
     try {
-      // Remove from Stripe
-      // Update the remove card endpoint:
       const response = await fetch(
         `${import.meta.env.VITE_API_URL || "https://adaskitchen-backend.vercel.app/api"}/payments/card/${paymentMethodId}`,
         {
@@ -547,13 +739,24 @@ const handleAddMoney = async () => {
     setSelectedAmount(amount);
   };
 
-  // Clear card form
-  const clearCardForm = () => {
-    if (elements) {
-      const cardElement = elements.getElement(CardElement);
-      if (cardElement) {
-        cardElement.clear();
-      }
+  // Handle card element change for Add Money
+  const handleCardElementChange = (event, elementType) => {
+    if (event.complete) {
+      setCardElementComplete(prev => ({
+        ...prev,
+        [elementType]: true
+      }));
+    } else {
+      setCardElementComplete(prev => ({
+        ...prev,
+        [elementType]: false
+      }));
+    }
+    
+    // Detect card type from card number
+    if (elementType === 'cardNumber' && event.value) {
+      const cardType = getCardType(event.value.replace(/\s/g, ''));
+      setDetectedCardTypeForMoney(cardType);
     }
   };
 
@@ -577,7 +780,7 @@ const handleAddMoney = async () => {
       <UserNavBar 
         toggleSidebar={toggleSidebars} 
         isSideBarOpen={isSidebarOpen}
-        user={userData}
+        userData={userData}
       />
       <UserSideBar 
         isOpen={isSidebarOpen} 
@@ -610,8 +813,8 @@ const handleAddMoney = async () => {
         </div>
       )}
       
-      <div className="md:flex md:justify-end">
-        <div className={`pt-32 px-5 ${isSidebarOpen ? "md:w-[70%] lg:w-[75%]" : "md:w-full"} transition-all duration-500`}>
+      <div className="lg:flex lg:justify-end">
+        <div className={`pt-32 px-5 ${isSidebarOpen ? "lg:w-[75%]" : "lg:w-full"} transition-all duration-500`}>
           <div className="max-w-7xl mx-auto pb-12 sm:px-6 lg:px-8">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Main Content */}
@@ -767,7 +970,7 @@ const handleAddMoney = async () => {
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                       Type
                                     </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <th className="px6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                       Amount
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -858,7 +1061,7 @@ const handleAddMoney = async () => {
 
       {/* Add Money Modal */}
       {showAddMoneyModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className={`fixed inset-0 backdrop-blur-sm bg-black/50 flex items-center justify-center p-4 z-50 ${isSidebarOpen ? "md:left-[30%] lg:left-[25%]" : "md:left-0"} transition-all duration-500`}>
           <motion.div 
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -882,7 +1085,7 @@ const handleAddMoney = async () => {
                     setPaymentIntentId(null);
                     setUseNewCard(false);
                     setSaveNewCard(false);
-                    clearCardForm();
+                    clearNewCardForMoneyForm();
                   }}
                   className="text-gray-400 hover:text-gray-600"
                   disabled={isProcessing}
@@ -959,6 +1162,7 @@ const handleAddMoney = async () => {
                             onClick={() => {
                               setUseNewCard(false);
                               setSelectedPaymentMethod(card.id);
+                              clearNewCardForMoneyForm();
                             }}
                           >
                             <div className="flex items-center justify-between text-black">
@@ -997,6 +1201,143 @@ const handleAddMoney = async () => {
                         ))}
                       </div>
                     )}
+
+                    {/* Use New Card Option */}
+                    <div className="mt-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUseNewCard(true);
+                          setSelectedPaymentMethod(null);
+                          setNewCardForMoneyHolderName(userData?.firstName || '');
+                        }}
+                        className={`text-sm ${useNewCard ? 'text-own-2 font-semibold' : 'text-own-2 underline'}`}
+                      >
+                        {useNewCard ? '✓ Using new card' : 'Use a new card'}
+                      </button>
+                    </div>
+
+                    {/* New Card Form for Add Money - Using Stripe Elements */}
+                    {useNewCard && (
+                      <div className="mt-6 space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Cardholder Name
+                          </label>
+                          <input
+                            type="text"
+                            value={newCardForMoneyHolderName}
+                            onChange={(e) => setNewCardForMoneyHolderName(e.target.value)}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-own-2 focus:border-transparent text-black"
+                            placeholder="Name on card"
+                            required
+                            disabled={isProcessing}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Card Number
+                          </label>
+                          <div className="p-4 border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-own-2 focus-within:border-transparent">
+                            <CardNumberElement
+                              options={{
+                                placeholder: "4242 4242 4242 4242",
+                                style: {
+                                  base: {
+                                    fontSize: "16px",
+                                    color: "#32325d",
+                                    fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+                                    "::placeholder": { color: "#a0aec0" },
+                                  },
+                                  invalid: {
+                                    color: "#e53e3e",
+                                  },
+                                },
+                              }}
+                              onChange={(e) => handleCardElementChange(e, 'cardNumber')}
+                              disabled={isProcessing}
+                            />
+                          </div>
+                          {detectedCardTypeForMoney && (
+                            <div className="mt-2 flex justify-end">
+                              <div className={`px-2 py-1 rounded text-xs font-bold text-white ${detectedCardTypeForMoney.color}`}>
+                                {detectedCardTypeForMoney.name}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Expiry Date
+                            </label>
+                            <div className="p-4 border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-own-2 focus-within:border-transparent">
+                              <CardExpiryElement
+                                options={{
+                                  placeholder: "MM/YY",
+                                  style: {
+                                    base: {
+                                      fontSize: "16px",
+                                      color: "#32325d",
+                                      fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+                                      "::placeholder": { color: "#a0aec0" },
+                                    },
+                                    invalid: {
+                                      color: "#e53e3e",
+                                    },
+                                  },
+                                }}
+                                onChange={(e) => handleCardElementChange(e, 'cardExpiry')}
+                                disabled={isProcessing}
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              CVC
+                            </label>
+                            <div className="p-4 border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-own-2 focus-within:border-transparent">
+                              <CardCvcElement
+                                options={{
+                                  placeholder: "123",
+                                  style: {
+                                    base: {
+                                      fontSize: "16px",
+                                      color: "#32325d",
+                                      fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+                                      "::placeholder": { color: "#a0aec0" },
+                                    },
+                                    invalid: {
+                                      color: "#e53e3e",
+                                    },
+                                  },
+                                }}
+                                onChange={(e) => handleCardElementChange(e, 'cardCvc')}
+                                disabled={isProcessing}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* <div className="mt-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={saveNewCard}
+                              onChange={(e) => setSaveNewCard(e.target.checked)}
+                              className="rounded text-own-2 focus:ring-own-2"
+                              disabled={isProcessing}
+                            />
+                            <span className="text-sm text-gray-700">Save this card for future purchases</span>
+                          </label>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Your card details are securely stored and encrypted
+                          </p>
+                        </div> */}
+                      </div>
+                    )}
                   </div>
 
                   <div className="mb-6 p-4 bg-amber-50 rounded-lg text-black">
@@ -1019,7 +1360,7 @@ const handleAddMoney = async () => {
                         setAlert(null);
                         setUseNewCard(false);
                         setSaveNewCard(false);
-                        clearCardForm();
+                        clearNewCardForMoneyForm();
                       }}
                       className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                       disabled={isProcessing}
@@ -1029,8 +1370,13 @@ const handleAddMoney = async () => {
                     <button
                       onClick={handleAddMoney}
                       className="flex-1 py-3 bg-own-2 text-white rounded-lg hover:bg-amber-600 transition-colors flex items-center justify-center"
-                      disabled={!amount || Number(amount) <= 0 || isProcessing || 
-                               (!useNewCard && !selectedPaymentMethod && savedCards.length > 0)}
+                      disabled={
+                        !amount || 
+                        Number(amount) <= 0 || 
+                        isProcessing || 
+                        (!useNewCard && !selectedPaymentMethod && savedCards.length > 0) ||
+                        (useNewCard && (!newCardForMoneyHolderName || !cardElementComplete.cardNumber || !cardElementComplete.cardExpiry || !cardElementComplete.cardCvc))
+                      }
                     >
                       {isProcessing ? (
                         <>
@@ -1044,7 +1390,7 @@ const handleAddMoney = async () => {
                   </div>
                 </>
               ) : (
-                /* 3D Secure Confirmation */
+                /* 3D Secure Confirmation - For new cards in Add Money */
                 <div className="text-center py-8">
                   <div className="mb-6">
                     <FontAwesomeIcon icon={faCreditCard} className="text-4xl text-own-2 mb-4" />
@@ -1091,9 +1437,9 @@ const handleAddMoney = async () => {
         </div>
       )}
 
-      {/* Add Payment Method Modal */} 
+      {/* Add Payment Method Modal - USING STRIPE ELEMENTS */} 
       {showAddPaymentModal && (
-        <div className="fixed inset-0 bg- bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className={`fixed inset-0 backdrop-blur-sm bg-black/50 flex items-center justify-center p-4 z-50 ${isSidebarOpen ? "md:left-[30%] lg:left-[25%]" : "md:left-0"} transition-all duration-500`}>
           <motion.div 
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -1128,10 +1474,23 @@ const handleAddMoney = async () => {
               )}
 
               <div className="mb-6">
-                <p className="text-gray-700 mb-3">Card Details</p>
-                <div className="p-4 border border-gray-300 rounded-lg">
-                  <CardElement
+                <label className="block text-gray-700 mb-2">Cardholder Name</label>
+                <input
+                  type="text"
+                  value={cardHolderName}
+                  onChange={(e) => setCardHolderName(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-own-2 focus:border-transparent text-black"
+                  placeholder="Name on card"
+                  disabled={isSavingCard}
+                />
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-gray-700 mb-2">Card Number</label>
+                <div className="p-4 border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-own-2 focus-within:border-transparent">
+                  <CardNumberElement
                     options={{
+                      placeholder: "4242 4242 4242 4242",
                       style: {
                         base: {
                           fontSize: "16px",
@@ -1144,20 +1503,74 @@ const handleAddMoney = async () => {
                         },
                       },
                     }}
+                    onChange={(e) => {
+                      if (e.complete) {
+                        const cardType = getCardType(e.value?.replace(/\s/g, '') || '');
+                        setDetectedCardType(cardType);
+                      }
+                    }}
+                    disabled={isSavingCard}
                   />
                 </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  Your card details are securely processed by Stripe
-                </p>
+                {detectedCardType && (
+                  <div className="mt-2 flex justify-end">
+                    <div className={`px-2 py-1 rounded text-xs font-bold text-white ${detectedCardType.color}`}>
+                      {detectedCardType.name}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                  <label className="block text-gray-700 mb-2">Expiry Date</label>
+                  <div className="p-4 border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-own-2 focus-within:border-transparent">
+                    <CardExpiryElement
+                      options={{
+                        placeholder: "MM/YY",
+                        style: {
+                          base: {
+                            fontSize: "16px",
+                            color: "#32325d",
+                            fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+                            "::placeholder": { color: "#a0aec0" },
+                          },
+                          invalid: {
+                            color: "#e53e3e",
+                          },
+                        },
+                      }}
+                      disabled={isSavingCard}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-gray-700 mb-2">CVC</label>
+                  <div className="p-4 border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-own-2 focus-within:border-transparent">
+                    <CardCvcElement
+                      options={{
+                        placeholder: "123",
+                        style: {
+                          base: {
+                            fontSize: "16px",
+                            color: "#32325d",
+                            fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+                            "::placeholder": { color: "#a0aec0" },
+                          },
+                          invalid: {
+                            color: "#e53e3e",
+                          },
+                        },
+                      }}
+                      disabled={isSavingCard}
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="p-4 bg-gray-50 rounded-lg mb-6">
                 <p className="text-sm text-gray-600">
-                  <span className="font-bold">Note:</span> This is a demonstration. In a real application, 
-                  card details are securely tokenized with Stripe and never touch our servers.
-                </p>
-                <p className="text-sm text-gray-600 mt-2">
-                  <span className="font-bold">Test card:</span> 4242 4242 4242 4242 | <span className="font-bold">Exp:</span> 12/34 | <span className="font-bold">CVC:</span> 123
+                  <span className="font-bold">Note:</span> Your card details are securely processed by Stripe and never stored on our servers.
                 </p>
               </div>
 
@@ -1176,7 +1589,7 @@ const handleAddMoney = async () => {
                 <button
                   onClick={handleAddPaymentMethod}
                   className="flex-1 py-3 bg-own-2 text-white rounded-lg hover:bg-amber-600 transition-colors flex items-center justify-center"
-                  disabled={!stripe || isSavingCard}
+                  disabled={!stripe || !elements || isSavingCard || !cardHolderName}
                 >
                   {isSavingCard ? (
                     <>

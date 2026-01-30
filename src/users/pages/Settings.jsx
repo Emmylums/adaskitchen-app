@@ -8,18 +8,24 @@ import {
   faEye,
   faEyeSlash,
   faCheck,
-  faTimes
+  faTimes,
+  faUser,
+  faPhone,
+  faCamera,
+  faImage
 } from "@fortawesome/free-solid-svg-icons";
 import UserNavBar from "../components/UserNavbar";
 import UserSideBar from "../components/UserSidebar";
 import { useUserData } from "../hooks/useUserData";
 import { useAuth } from "../../context/AuthContext";
-import { db } from "../../firebaseConfig";
+import { db, storage } from "../../firebaseConfig";
 import { doc, updateDoc } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { 
   updatePassword, 
   reauthenticateWithCredential,
-  EmailAuthProvider 
+  EmailAuthProvider,
+  updateProfile
 } from "firebase/auth";
 import { createNotification, NotificationTemplates } from "../services/notificationService";
 
@@ -46,6 +52,12 @@ export default function Settings() {
     phone: "",
     displayName: ""
   });
+  
+  // Profile image state
+  const [profileImage, setProfileImage] = useState(null);
+  const [profileImageFile, setProfileImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
+  const [uploadingImage, setUploadingImage] = useState(false);
   
   // Password form state
   const [passwordForm, setPasswordForm] = useState({
@@ -75,6 +87,13 @@ export default function Settings() {
         phone: userData.phone || "",
         displayName: userData.displayName || user?.displayName || ""
       });
+      
+      // Set profile image
+      if (userData.photoURL) {
+        setProfileImage(userData.photoURL);
+      } else if (user?.photoURL) {
+        setProfileImage(user.photoURL);
+      }
     }
   }, [userData, user]);
 
@@ -94,6 +113,60 @@ export default function Settings() {
       ...prev,
       [name]: value
     }));
+  };
+
+  // Handle profile image selection
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Check file type
+      if (!file.type.match('image.*')) {
+        setSaveError("Please select an image file (JPG, PNG, GIF)");
+        setTimeout(() => setSaveError(""), 3000);
+        return;
+      }
+      
+      // Check file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setSaveError("Image size should be less than 5MB");
+        setTimeout(() => setSaveError(""), 3000);
+        return;
+      }
+      
+      setProfileImageFile(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Upload profile image to Firebase Storage
+  const uploadProfileImage = async (userId) => {
+    if (!profileImageFile) return null;
+    
+    try {
+      setUploadingImage(true);
+      
+      // Create storage reference
+      const imageRef = ref(storage, `profile-images/${userId}/${Date.now()}_${profileImageFile.name}`);
+      
+      // Upload image
+      await uploadBytes(imageRef, profileImageFile);
+      
+      // Get download URL
+      const downloadURL = await getDownloadURL(imageRef);
+      
+      setUploadingImage(false);
+      return downloadURL;
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      setUploadingImage(false);
+      throw error;
+    }
   };
 
   // Toggle password visibility
@@ -125,6 +198,12 @@ export default function Settings() {
 
       const userDocRef = doc(db, "users", user.uid);
       
+      // Upload profile image if selected
+      let photoURL = profileImage;
+      if (profileImageFile) {
+        photoURL = await uploadProfileImage(user.uid);
+      }
+
       // Prepare update data
       const updateData = {
         firstName: formData.firstName.trim(),
@@ -134,13 +213,32 @@ export default function Settings() {
         updatedAt: new Date().toISOString()
       };
 
+      // Add photoURL if it exists
+      if (photoURL) {
+        updateData.photoURL = photoURL;
+      }
+
       // Update Firestore
       await updateDoc(userDocRef, updateData);
+
+      // Update Firebase Auth profile if display name or photo changed
+      if (photoURL || formData.firstName || formData.lastName) {
+        await updateProfile(user, {
+          displayName: updateData.displayName,
+          photoURL: photoURL || user.photoURL
+        });
+      }
 
       // Create profile updated notification
       await createNotification(user.uid, NotificationTemplates.PROFILE_UPDATED());
 
       setSaveSuccess("Profile updated successfully!");
+      
+      // Clear image preview after successful upload
+      if (profileImageFile) {
+        setProfileImageFile(null);
+        setImagePreview("");
+      }
       
       // Clear success message after 3 seconds
       setTimeout(() => {
@@ -253,6 +351,18 @@ export default function Settings() {
         phone: userData.phone || "",
         displayName: userData.displayName || user?.displayName || ""
       });
+      
+      // Reset profile image
+      if (userData.photoURL) {
+        setProfileImage(userData.photoURL);
+      } else if (user?.photoURL) {
+        setProfileImage(user.photoURL);
+      } else {
+        setProfileImage(null);
+      }
+      
+      setProfileImageFile(null);
+      setImagePreview("");
     }
     setSaveSuccess("");
     setSaveError("");
@@ -329,7 +439,7 @@ export default function Settings() {
       <UserNavBar 
         toggleSidebar={toggleSidebars} 
         isSideBarOpen={isSidebarOpen}
-        user={userData}
+        userData={userData}
       />
       <UserSideBar 
         isOpen={isSidebarOpen} 
@@ -539,8 +649,8 @@ export default function Settings() {
         )}
       </AnimatePresence>
       
-      <div className="md:flex md:justify-end">
-        <div className={`pt-32 px-5 ${isSidebarOpen ? "md:w-[70%] lg:w-[75%]" : "md:w-full"} transition-all duration-500`}>
+      <div className="lg:flex lg:justify-end">
+        <div className={`pt-32 px-5 ${isSidebarOpen ? "lg:w-[75%]" : "lg:w-full"} transition-all duration-500`}>
           <div className="max-w-7xl mx-auto pb-12 sm:px-6 lg:px-8">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Main Content */}
@@ -573,6 +683,81 @@ export default function Settings() {
                   )}
                   
                   <form onSubmit={handleSaveChanges}>
+                    {/* Profile Image Section */}
+                    <div className="mb-8">
+                      <h4 className="font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">
+                        Profile Picture
+                      </h4>
+                      <div className="flex items-center space-x-6">
+                        <div className="relative">
+                          <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-lg">
+                            {imagePreview ? (
+                              <img 
+                                src={imagePreview} 
+                                alt="Profile preview" 
+                                className="w-full h-full object-cover"
+                              />
+                            ) : profileImage ? (
+                              <img 
+                                src={profileImage} 
+                                alt="Profile" 
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-gradient-to-br from-amber-100 to-amber-300 flex items-center justify-center">
+                                <FontAwesomeIcon 
+                                  icon={faUser} 
+                                  className="w-16 h-16 text-amber-600"
+                                />
+                              </div>
+                            )}
+                          </div>
+                          {uploadingImage && (
+                            <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex-1">
+                          <h5 className="font-medium text-gray-700 mb-2">Update Profile Picture</h5>
+                          <p className="text-sm text-gray-500 mb-4">
+                            Upload a new photo. JPG, PNG, or GIF up to 5MB.
+                          </p>
+                          <div className="flex flex-wrap gap-3">
+                            <label className="cursor-pointer">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleImageChange}
+                                className="hidden"
+                                disabled={uploadingImage || saving}
+                              />
+                              <span className="px-4 py-2 bg-own-2 text-white rounded-xl hover:bg-amber-600 transition-colors flex items-center gap-2 disabled:opacity-50">
+                                <FontAwesomeIcon icon={faCamera} />
+                                {imagePreview ? 'Change Photo' : 'Upload Photo'}
+                              </span>
+                            </label>
+                            
+                            {(imagePreview || profileImage) && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setProfileImage(null);
+                                  setProfileImageFile(null);
+                                  setImagePreview("");
+                                }}
+                                className="px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
+                                disabled={uploadingImage || saving}
+                              >
+                                Remove Photo
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="mb-8">
                       <h4 className="font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">
                         Personal Information
@@ -580,7 +765,10 @@ export default function Settings() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
-                            First Name *
+                            <div className="flex items-center gap-2">
+                              <FontAwesomeIcon icon={faUser} className="text-own-2" />
+                              First Name *
+                            </div>
                           </label>
                           <input 
                             type="text" 
@@ -594,7 +782,10 @@ export default function Settings() {
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Last Name *
+                            <div className="flex items-center gap-2">
+                              <FontAwesomeIcon icon={faUser} className="text-own-2" />
+                              Last Name *
+                            </div>
                           </label>
                           <input 
                             type="text" 
@@ -630,7 +821,10 @@ export default function Settings() {
 
                     <div className="mb-8">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Phone Number
+                        <div className="flex items-center gap-2">
+                          <FontAwesomeIcon icon={faPhone} className="text-own-2" />
+                          Phone Number
+                        </div>
                       </label>
                       <input 
                         type="tel" 
@@ -675,13 +869,13 @@ export default function Settings() {
                     <div className="flex gap-4 pt-4 border-t border-gray-200">
                       <button 
                         type="submit"
-                        disabled={saving}
+                        disabled={saving || uploadingImage}
                         className="px-6 py-3 bg-own-2 text-white rounded-xl hover:bg-amber-600 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {saving ? (
+                        {saving || uploadingImage ? (
                           <>
                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                            Saving...
+                            {uploadingImage ? 'Uploading...' : 'Saving...'}
                           </>
                         ) : (
                           <>
@@ -694,7 +888,7 @@ export default function Settings() {
                         type="button"
                         onClick={handleCancel}
                         className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-2"
-                        disabled={saving}
+                        disabled={saving || uploadingImage}
                       >
                         <FontAwesomeIcon icon={faTimes} />
                         Cancel

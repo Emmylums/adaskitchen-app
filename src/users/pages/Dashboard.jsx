@@ -53,6 +53,43 @@ export default function Dashboard() {
     getTotalQuantity 
   } = useCart();
 
+  // Check email verification status
+  useEffect(() => {
+    if (user && !user.emailVerified && user.providerData?.[0]?.providerId !== "google.com") {
+      // Show verification warning if user is not verified
+      const showWarning = () => {
+        const warningDiv = document.createElement('div');
+        warningDiv.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-yellow-50 border border-yellow-200 text-yellow-800 px-6 py-4 rounded-lg shadow-lg z-50 max-w-md';
+        warningDiv.innerHTML = `
+          <div class="flex items-start">
+            <div class="flex-shrink-0">
+              <svg class="h-6 w-6 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <div class="ml-3">
+              <h3 class="text-sm font-medium">Verify Your Email</h3>
+              <div class="mt-2 text-sm">
+                <p>Please verify your email (${user.email}) to access all features.</p>
+                <p class="mt-1 text-xs">Check your inbox for the verification link.</p>
+              </div>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(warningDiv);
+        
+        // Remove warning after 10 seconds
+        setTimeout(() => {
+          if (document.body.contains(warningDiv)) {
+            document.body.removeChild(warningDiv);
+          }
+        }, 10000);
+      };
+      
+      showWarning();
+    }
+  }, [user]);
+
   // Change this function to close others and only keep one expanded
   const toggleOrderExpansion = (orderId) => {
     if (expandedOrders.includes(orderId)) {
@@ -381,7 +418,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <UserNavBar toggleSidebar={toggleSidebars} isSideBarOpen={isSidebarOpen}/>
+        <UserNavBar toggleSidebar={toggleSidebars} isSideBarOpen={isSidebarOpen} />
         <div className="flex justify-center items-center min-h-screen">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-own-2 mx-auto"></div>
@@ -417,7 +454,7 @@ export default function Dashboard() {
       <UserNavBar 
         toggleSidebar={toggleSidebars} 
         isSideBarOpen={isSidebarOpen}
-        user={userData}
+        userData={userData}
       />
       <UserSideBar 
         isOpen={isSidebarOpen} 
@@ -426,8 +463,8 @@ export default function Dashboard() {
         setActiveTab={setActiveTab} 
         activeTab={activeTab}
       />
-      <div className="md:flex  md:justify-end">
-        <div className={`pt-32 px-5 ${isSidebarOpen ? "md:w-[70%] lg:w-[75%]" : "md:w-full"} transition-all duration-500`}>
+      <div className="lg:flex  lg:justify-end">
+        <div className={`pt-32 px-5 ${isSidebarOpen ? "lg:w-[75%]" : "lg:w-full"} transition-all duration-500`}>
           <div className="max-w-7xl mx-auto pb-12 sm:px-6 lg:px-8">
             {/* Refresh Button */}
             <div className="flex justify-end mb-4">

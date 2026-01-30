@@ -2,10 +2,9 @@ import { useState, useEffect, useRef } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Link } from "react-router-dom";
 import {Element} from 'react-scroll';
-import { faBars, faBell } from "@fortawesome/free-solid-svg-icons";
-import boy from "../../assets/girl.png";
+import { faBars, faBell, faUser } from "@fortawesome/free-solid-svg-icons";
 
-const UserNavBar = ({toggleSidebar, isSideBarOpen}) => {
+const UserNavBar = ({toggleSidebar, isSideBarOpen, userData}) => {
     const [isSticky, setIsSticky] = useState(false);
     const [showBackground, setShowBackground] = useState(false);
     const hideTimerRef = useRef(null);
@@ -50,9 +49,13 @@ const UserNavBar = ({toggleSidebar, isSideBarOpen}) => {
                             <FontAwesomeIcon icon={faBars}/>
                         </button>
                     </div>
-                    <div  >
-                        <div className="w-12 h-12 bg-own-2 rounded-full p-2">
-                            <img src={boy} alt="" className="object-cover rounded-full"/>
+                    <div>
+                        <div className={`w-14 h-14 bg-own-2 rounded-full ${userData?.photoURL ? "" : "flex items-center justify-center p-2"}`}>
+                          {userData?.photoURL ? (
+                            <img src={userData.photoURL} alt={userData?.displayName || "User"} className="w-full h-full object-cover rounded-full"/>
+                          ) : (
+                            <FontAwesomeIcon icon={faUser} className="text-3xl text-white" />
+                          )}
                         </div>
                     </div>
                 </header>

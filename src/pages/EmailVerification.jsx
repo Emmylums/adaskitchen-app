@@ -340,7 +340,7 @@ export default function EmailVerification() {
                                 <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl">
                                     <div className="flex items-center justify-center mb-2">
                                         <FontAwesomeIcon icon={faEnvelope} className="h-5 w-5 text-green-500 mr-2" />
-                                        <span className="font-medium text-lg">{email}</span>
+                                        <span className="font-medium text-lg text-black">{email}</span>
                                     </div>
                                     <p className="text-sm text-green-600">
                                         Your email has been verified. You can now log in to your account.

@@ -79,7 +79,7 @@ const UserSideBar = ({ isOpen, closeSidebar, activeTab, setActiveTab, userData }
   const handleNavigation = (tabId) => {
     setActiveTab(tabId);
     // Close sidebar on mobile after clicking a link
-    if (window.innerWidth < 768) {
+    if (window.innerWidth < 1024) {
       closeSidebar();
     }
   };
@@ -90,13 +90,13 @@ const UserSideBar = ({ isOpen, closeSidebar, activeTab, setActiveTab, userData }
       <div
         onClick={closeSidebar}
         className={`${
-          isOpen ? "bg-black/50 backdrop-blur-sm md:hidden z-50 fixed top-0 w-full h-screen" : ""
+          isOpen ? "bg-black/50 backdrop-blur-sm lg:hidden z-50 fixed top-0 w-full h-screen" : ""
         }`}
       ></div>
 
       {/* Sidebar */}
       <div
-        className={`fixed top-0 w-80 md:w-[30%] lg:w-[25%] h-screen bg-own-1 md:bg-transparent text-[#dfe3e7] transform ${
+        className={`fixed top-0 w-80 lg:w-[25%] h-screen bg-own-1 lg:bg-transparent text-[#dfe3e7] transform ${
           isOpen ? "translate-x-0" : "translate-x-[-320px]"
         } transition-transform duration-500 z-50`}
       >
@@ -107,7 +107,7 @@ const UserSideBar = ({ isOpen, closeSidebar, activeTab, setActiveTab, userData }
             opacity: isOpen ? 1 : 0 
           }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="fixed top-0 left-0 h-full bg-white shadow-xl z-40 lg:relative lg:left-0 lg:shadow-none lg:z-0 pb-20 md:pb-0"
+          className="fixed top-0 left-0 h-full bg-white shadow-xl z-40 lg:relative lg:left-0 lg:shadow-none lg:z-0 pb-20 lg:pb-0"
         >
           <div className="w-80 flex justify-between items-center p-4 border-b lg:hidden">
             <span className="font-bold text-own-2 text-lg">Menu</span>

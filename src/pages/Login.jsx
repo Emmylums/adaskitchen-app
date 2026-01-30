@@ -597,26 +597,6 @@ export default function Login() {
                             </div>
                         )}
 
-                        {/* Email Verification Notice (only show if no unverified email error) */}
-                        {!unverifiedEmail && (
-                            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-                                <div className="flex items-start">
-                                    <FontAwesomeIcon 
-                                        icon={faExclamationTriangle} 
-                                        className="h-5 w-5 text-blue-400 mr-3 mt-0.5 flex-shrink-0" 
-                                    />
-                                    <div>
-                                        <p className="text-sm text-blue-700 font-medium mb-1">
-                                            Email Verification Required
-                                        </p>
-                                        <p className="text-xs text-blue-600">
-                                            If you signed up with email/password, you must verify your email before logging in.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
                         <form onSubmit={handleSubmit}>
                             {/* Email Field */}
                             <div className="mb-6">

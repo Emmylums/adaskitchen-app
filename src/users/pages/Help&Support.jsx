@@ -22,10 +22,10 @@ export default function Support() {
 
   return (
     <>
-      <UserNavBar toggleSidebar={toggleSidebars} isSideBarOpen={isSidebarOpen}/>
+      <UserNavBar toggleSidebar={toggleSidebars} isSideBarOpen={isSidebarOpen} userData={userData}/>
       <UserSideBar isOpen={isSidebarOpen} closeSidebar={closeSidebar} userData={userData} setActiveTab={setActiveTab} activeTab={activeTab}/>
-      <div className="md:flex  md:justify-end">
-      <div className={`pt-32 px-5 ${isSidebarOpen ? "md:w-[70%] lg:w-[75%]" : "md:w-full"} transition-all duration-500`}>
+      <div className="lg:flex  lg:justify-end">
+      <div className={`pt-32 px-5 ${isSidebarOpen ? "lg:w-[75%]" : "lg:w-full"} transition-all duration-500`}>
 
       <div className="max-w-7xl mx-auto pb-12 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

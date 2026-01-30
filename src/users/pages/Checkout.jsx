@@ -18,8 +18,18 @@ import {
   faHome,
   faClock,
   faExclamationTriangle,
-  faSpinner
+  faSpinner,
+  faPlusCircle
 } from "@fortawesome/free-solid-svg-icons";
+// Import brand icons correctly
+import { 
+  faCcVisa, 
+  faCcMastercard, 
+  faCcAmex,
+  faCcDiscover,
+  faCcDinersClub,
+  faCcJcb
+} from "@fortawesome/free-brands-svg-icons";
 import AlertBanner from "../../components/AlertBanner";
 import UserNavBar from "../components/UserNavbar";
 import UserSideBar from "../components/UserSidebar";
@@ -30,14 +40,115 @@ import {
   addDoc, 
   updateDoc, 
   doc, 
-  serverTimestamp
+  serverTimestamp,
+  arrayUnion
 } from "firebase/firestore";
 import { db } from "../../firebaseConfig";
-import { CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { useStripe, useElements, CardNumberElement, CardExpiryElement, CardCvcElement } from "@stripe/react-stripe-js";
 import { createNotification, NotificationTemplates } from "../services/notificationService";
 
+// Card type detection utility
+const getCardType = (number) => {
+  const cleanNumber = number.replace(/\D/g, '');
+  
+  if (!cleanNumber) return null;
+  
+  // Visa
+  if (/^4/.test(cleanNumber)) return {
+    type: 'visa',
+    name: 'Visa',
+    color: 'bg-blue-500',
+    textColor: 'text-blue-500',
+    icon: faCcVisa,
+    bgColor: 'bg-gradient-to-r from-blue-400 to-blue-600'
+  };
+  
+  // Mastercard
+  if (/^5[1-5]/.test(cleanNumber) || /^2[2-7]/.test(cleanNumber)) return {
+    type: 'mastercard',
+    name: 'Mastercard',
+    color: 'bg-red-500',
+    textColor: 'text-red-500',
+    icon: faCcMastercard,
+    bgColor: 'bg-gradient-to-r from-red-400 to-red-600'
+  };
+  
+  // American Express
+  if (/^3[47]/.test(cleanNumber)) return {
+    type: 'amex',
+    name: 'American Express',
+    color: 'bg-green-500',
+    textColor: 'text-green-500',
+    icon: faCcAmex,
+    bgColor: 'bg-gradient-to-r from-green-400 to-green-600'
+  };
+  
+  // Discover
+  if (/^6(?:011|5)/.test(cleanNumber)) return {
+    type: 'discover',
+    name: 'Discover',
+    color: 'bg-orange-500',
+    textColor: 'text-orange-500',
+    icon: faCcDiscover,
+    bgColor: 'bg-gradient-to-r from-orange-400 to-orange-600'
+  };
+  
+  // Diners Club
+  if (/^3(?:0[0-5]|[68])/.test(cleanNumber)) return {
+    type: 'diners',
+    name: 'Diners Club',
+    color: 'bg-purple-500',
+    textColor: 'text-purple-500',
+    icon: faCcDinersClub,
+    bgColor: 'bg-gradient-to-r from-purple-400 to-purple-600'
+  };
+  
+  // JCB
+  if (/^35/.test(cleanNumber)) return {
+    type: 'jcb',
+    name: 'JCB',
+    color: 'bg-pink-500',
+    textColor: 'text-pink-500',
+    icon: faCcJcb,
+    bgColor: 'bg-gradient-to-r from-pink-400 to-pink-600'
+  };
+  
+  // UnionPay
+  if (/^62/.test(cleanNumber)) return {
+    type: 'unionpay',
+    name: 'UnionPay',
+    color: 'bg-cyan-500',
+    textColor: 'text-cyan-500',
+    icon: faCreditCard,
+    bgColor: 'bg-gradient-to-r from-cyan-400 to-cyan-600'
+  };
+  
+  // Default/Unknown
+  return {
+    type: 'unknown',
+    name: 'Card',
+    color: 'bg-gray-500',
+    textColor: 'text-gray-500',
+    icon: faCreditCard,
+    bgColor: 'bg-gradient-to-r from-gray-400 to-gray-600'
+  };
+};
+
+// Card Brand Display Component
+const CardBrandDisplay = ({ cardType }) => {
+  if (!cardType) return null;
+  
+  const IconComponent = cardType.icon || faCreditCard;
+  
+  return (
+    <div className={`px-3 py-2 rounded-lg flex items-center justify-center ${cardType.bgColor} text-white shadow-sm`}>
+      <FontAwesomeIcon icon={IconComponent} className="text-xl" />
+      <span className="ml-2 font-semibold text-sm">{cardType.name}</span>
+    </div>
+  );
+};
+
 export default function Checkout() {
-  // Move all hooks to the top level - NO CONDITIONAL HOOKS
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("Cart");
   const [alert, setAlert] = useState(null);
@@ -51,6 +162,18 @@ export default function Checkout() {
   const [useNewCard, setUseNewCard] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  
+  // Card form states
+  const [cardHolderName, setCardHolderName] = useState("");
+  const [detectedCardType, setDetectedCardType] = useState(null);
+  const [saveNewCard, setSaveNewCard] = useState(false);
+  
+  // Card element completion states
+  const [cardElementComplete, setCardElementComplete] = useState({
+    cardNumber: false,
+    cardExpiry: false,
+    cardCvc: false
+  });
   
   // Form states
   const [formData, setFormData] = useState({
@@ -89,11 +212,10 @@ export default function Checkout() {
 
     const fetchCards = async () => {
       try {
-
         const cards = userData.savedCards;
-        setSavedCards(cards);
+        setSavedCards(cards || []);
 
-        const defaultCard = cards.find(c => c.isDefault);
+        const defaultCard = cards?.find(c => c.isDefault);
         if (defaultCard) {
           setSelectedCard(defaultCard);
         }
@@ -115,6 +237,7 @@ export default function Checkout() {
         email: userData.email || prev.email,
         phone: userData.phone || prev.phone
       }));
+      setCardHolderName(`${userData.firstName || ''} ${userData.lastName || ''}`.trim());
     }
   }, [userData]);
 
@@ -160,6 +283,27 @@ export default function Checkout() {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
+  };
+
+  // Handle card element change
+  const handleCardElementChange = (event, elementType) => {
+    if (event.complete) {
+      setCardElementComplete(prev => ({
+        ...prev,
+        [elementType]: true
+      }));
+    } else {
+      setCardElementComplete(prev => ({
+        ...prev,
+        [elementType]: false
+      }));
+    }
+    
+    // Detect card type from card number
+    if (elementType === 'cardNumber' && event.value) {
+      const cardType = getCardType(event.value.replace(/\s/g, ''));
+      setDetectedCardType(cardType);
+    }
   };
 
   const calculateSubtotal = () => {
@@ -221,354 +365,242 @@ export default function Checkout() {
     };
   };
 
-  // Test API endpoint
-  const testAPIEndpoint = async () => {
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "https://adaskitchen-backend.vercel.app/api"}/health`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          mode: "cors", // Explicitly set CORS mode
-          credentials: "include" // Include credentials if needed
-        }
-      );
-      
-      // If we get any response (even 404), the server is reachable
-      if (response.status >= 200 && response.status < 500) {
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.log("API health check failed, but we'll try to proceed:", error.message);
-      // Instead of failing completely, we'll try to proceed
-      // The payment endpoints might still work even if health check fails
-      return true; // Changed from false to true to allow proceeding
-    }
-  };
-
   // Handle order submission
   const handleSubmit = async e => {
-  e.preventDefault();
-  
-  if (isPaying || isProcessingPayment) return;
-  
-  // Validation (keep your existing validation code)
-  if (!selectedAddress) {
-    setAlert({
-      message: "Please select a delivery address",
-      type: "error"
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    return;
-  }
-  
-  // ... rest of validation code
-
-  try {
-    setIsPaying(true);
-    setLoading(true);
-    setIsProcessingPayment(true);
-
-    // Calculate payment split
-    const total = calculateTotal();
-    const walletBalance = userData?.walletBalance || 0;
-    const { walletAmount, stripeAmount } = splitPayment(walletBalance, total);
-
-    // Prepare order items
-    const orderItems = availableCartItems.map(item => {
-      const dishDetails = getDishDetails(item.id);
-      return {
-        id: item.id,
-        name: item.name,
-        price: item.price * 100,
-        quantity: item.quantity,
-        image: dishDetails?.image || item.image || "/images/fallback-food.jpg",
-        total: (item.price * item.quantity) * 100
-      };
-    });
-
-    // Prepare order data
-    const orderData = {
-      customerId: userData.uid,
-      customerName: `${formData.firstName} ${formData.lastName}`,
-      customerEmail: formData.email,
-      customerPhone: formData.phone,
-      items: orderItems,
-      subtotal: calculateSubtotal() * 100,
-      deliveryFee: calculateDelivery() * 100,
-      total: total * 100,
-      walletAmount: walletAmount,
-      stripeAmount: stripeAmount,
-      paymentMethod: formData.paymentMethod,
-      paymentStatus: "pending",
-      orderStatus: "pending",
-      deliveryAddress: selectedAddress,
-      deliveryInstructions: formData.deliveryInstructions || "",
-      orderNumber: generateOrderNumber(),
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    };
-
-    // 1️⃣ Create order in Firestore
-    const orderRef = await addDoc(collection(db, "orders"), orderData);
-    const orderId = orderRef.id;
-
-    // 2️⃣ Handle wallet-only payment
-    if (formData.paymentMethod === "wallet" && stripeAmount === 0) {
-      
-      // Deduct from wallet
-      if (walletAmount > 0 && userData?.uid) {
-        const userRef = doc(db, "users", userData.uid);
-        await updateDoc(userRef, {
-          walletBalance: walletBalance - walletAmount,
-          updatedAt: serverTimestamp()
-        });
-      }
-      
-      // Update order status
-      await updateDoc(orderRef, {
-        paymentStatus: "paid",
-        orderStatus: "confirmed",
-        verified: true,
-        paidAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+    e.preventDefault();
+    
+    if (isPaying || isProcessingPayment) return;
+    
+    // Validation
+    if (!selectedAddress) {
+      setAlert({
+        message: "Please select a delivery address",
+        type: "error"
       });
-
-      // Create order confirmation notification
-      await createNotification(userData.uid,
-        NotificationTemplates.ORDER_CONFIRMED(orderData.orderNumber, orderData.total)
-      );
-      
-      // Create wallet usage notification if wallet was used
-      if (walletAmount > 0) {
-        await createNotification(userData.uid,
-          NotificationTemplates.WALLET_USED(
-            walletAmount,
-            walletBalance - walletAmount,
-            orderData.orderNumber
-          )
-        );
-      }
-
-      // Set order details and confirm
-      setOrderDetails({
-        ...orderData,
-        id: orderId,
-        items: orderItems
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    
+    if (formData.paymentMethod === "wallet" && !isWalletSufficient()) {
+      setAlert({
+        message: "Insufficient wallet balance. Please add funds or choose another payment method.",
+        type: "error"
       });
-      
-      clearCart();
-      setOrderConfirmed(true);
-      setIsPaying(false);
-      setLoading(false);
-      setIsProcessingPayment(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
-    // 3️⃣ Handle card payment (with or without wallet)
-    if (formData.paymentMethod === "card" && stripeAmount > 0) {
+    if (formData.paymentMethod === "card" && savedCards.length === 0 && !useNewCard) {
+      setAlert({
+        message: "Please select a card or add a new one.",
+        type: "error"
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (formData.paymentMethod === "card" && useNewCard) {
+      if (!cardHolderName.trim()) {
+        setAlert({
+          message: "Please enter cardholder name",
+          type: "error"
+        });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
       
-      try {
-        // Create payment intent
-        const paymentIntentData = {
-          amount: total * 100,
-          orderId: orderId,
-          userId: userData.uid,
-          walletAmount: walletAmount,
-          currency: "gbp"
+      if (!cardElementComplete.cardNumber || !cardElementComplete.cardExpiry || !cardElementComplete.cardCvc) {
+        setAlert({
+          message: "Please complete all card details",
+          type: "error"
+        });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+    }
+
+    try {
+      setIsPaying(true);
+      setLoading(true);
+      setIsProcessingPayment(true);
+
+      // Calculate payment split
+      const total = calculateTotal();
+      const walletBalance = userData?.walletBalance || 0;
+      const { walletAmount, stripeAmount } = splitPayment(walletBalance, total);
+
+      // Prepare order items
+      const orderItems = availableCartItems.map(item => {
+        const dishDetails = getDishDetails(item.id);
+        return {
+          id: item.id,
+          name: item.name,
+          price: item.price * 100,
+          quantity: item.quantity,
+          image: dishDetails?.image || item.image || "/images/fallback-food.jpg",
+          total: (item.price * item.quantity) * 100
         };
+      });
 
-        if (selectedCard && !useNewCard) {
-          paymentIntentData.paymentMethodId = selectedCard.id;
-        }
+      // Prepare order data
+      const orderData = {
+        customerId: userData.uid,
+        customerName: `${formData.firstName} ${formData.lastName}`,
+        customerEmail: formData.email,
+        customerPhone: formData.phone,
+        items: orderItems,
+        subtotal: calculateSubtotal() * 100,
+        deliveryFee: calculateDelivery() * 100,
+        total: total * 100,
+        walletAmount: walletAmount,
+        stripeAmount: stripeAmount,
+        paymentMethod: formData.paymentMethod,
+        paymentStatus: "pending",
+        orderStatus: "pending",
+        deliveryAddress: selectedAddress,
+        deliveryInstructions: formData.deliveryInstructions || "",
+        orderNumber: generateOrderNumber(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
 
-        const API_URL = import.meta.env.VITE_API_URL || "https://adaskitchen-backend.vercel.app/api";
+      // 1️⃣ Create order in Firestore
+      const orderRef = await addDoc(collection(db, "orders"), orderData);
+      const orderId = orderRef.id;
+
+      // 2️⃣ Handle wallet-only payment
+      if (formData.paymentMethod === "wallet" && stripeAmount === 0) {
         
-        const paymentIntentResponse = await fetch(
-          `${API_URL}/payments/create-payment-intent`,
-          {
-            method: "POST",
-            headers: { 
-              "Content-Type": "application/json",
-              "Accept": "application/json"
-            },
-            body: JSON.stringify(paymentIntentData)
-          }
-        );
-
-        // Handle CORS and network errors
-        if (!paymentIntentResponse.ok) {
-          // Check if it's a CORS issue (status 0 or no response)
-          if (paymentIntentResponse.status === 0) {
-            throw new Error("Cannot connect to payment server. This may be a temporary issue. Please try again.");
-          }
-          
-          const errorText = await paymentIntentResponse.text();
-          throw new Error(`Payment error: ${paymentIntentResponse.status} - ${errorText}`);
-        }
-
-        const paymentIntentResult = await paymentIntentResponse.json();
-
-        // Check if payment requires additional action
-        if (paymentIntentResult.requiresAction) {
-          // Handle 3D Secure or other authentication
-          const { error: confirmError } = await stripe.handleCardAction(
-            paymentIntentResult.clientSecret
-          );
-          
-          if (confirmError) {
-            throw confirmError;
-          }
-        }
-
-        // If wallet-only payment
-        if (paymentIntentResult.walletOnly) {
-          // Handle as wallet payment
-          if (walletAmount > 0 && userData?.uid) {
-            const userRef = doc(db, "users", userData.uid);
-            await updateDoc(userRef, {
-              walletBalance: walletBalance - walletAmount,
-              updatedAt: serverTimestamp()
-            });
-          }
-          
-          await updateDoc(orderRef, {
-            paymentStatus: "paid",
-            orderStatus: "confirmed",
-            verified: true,
-            paidAt: serverTimestamp(),
+        // Deduct from wallet
+        if (walletAmount > 0 && userData?.uid) {
+          const userRef = doc(db, "users", userData.uid);
+          await updateDoc(userRef, {
+            walletBalance: walletBalance - walletAmount,
             updatedAt: serverTimestamp()
           });
+        }
+        
+        // Update order status
+        await updateDoc(orderRef, {
+          paymentStatus: "paid",
+          orderStatus: "confirmed",
+          verified: true,
+          paidAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
 
-          // Create notifications
+        // Create order confirmation notification
+        await createNotification(userData.uid,
+          NotificationTemplates.ORDER_CONFIRMED(orderData.orderNumber, orderData.total)
+        );
+        
+        // Create wallet usage notification if wallet was used
+        if (walletAmount > 0) {
           await createNotification(userData.uid,
-            NotificationTemplates.ORDER_CONFIRMED(orderData.orderNumber, orderData.total)
+            NotificationTemplates.WALLET_USED(
+              walletAmount,
+              walletBalance - walletAmount,
+              orderData.orderNumber
+            )
           );
-          
-          if (walletAmount > 0) {
-            await createNotification(userData.uid,
-              NotificationTemplates.WALLET_USED(
-                walletAmount,
-                walletBalance - walletAmount,
-                orderData.orderNumber
-              )
-            );
-          }
-
-          setOrderDetails({
-            ...orderData,
-            id: orderId,
-            items: orderItems
-          });
-          
-          clearCart();
-          setOrderConfirmed(true);
-          setIsPaying(false);
-          setLoading(false);
-          setIsProcessingPayment(false);
-          return;
         }
 
-        // Handle card payment with Stripe
-        if (paymentIntentResult.clientSecret) {
-          let paymentResult;
+        // Set order details and confirm
+        setOrderDetails({
+          ...orderData,
+          id: orderId,
+          items: orderItems
+        });
+        
+        clearCart();
+        setOrderConfirmed(true);
+        setIsPaying(false);
+        setLoading(false);
+        setIsProcessingPayment(false);
+        return;
+      }
+
+      // 3️⃣ Handle card payment (with or without wallet)
+      if (formData.paymentMethod === "card" && stripeAmount > 0) {
+        
+        try {
+          // Create payment intent
+          const paymentIntentData = {
+            amount: total * 100,
+            orderId: orderId,
+            userId: userData.uid,
+            walletAmount: walletAmount,
+            currency: "gbp",
+            saveCard: saveNewCard
+          };
+
+          if (selectedCard && !useNewCard) {
+            paymentIntentData.paymentMethodId = selectedCard.id;
+          }
+
+          const API_URL = import.meta.env.VITE_API_URL || "https://adaskitchen-backend.vercel.app/api";
           
-          if (useNewCard) {
-            // New card payment
-            if (!stripe || !elements) {
-              throw new Error("Stripe not loaded. Please refresh the page.");
-            }
-            
-            const cardElement = elements.getElement(CardElement);
-            if (!cardElement) {
-              throw new Error("Card element not found. Please enter card details.");
-            }
-
-            paymentResult = await stripe.confirmCardPayment(paymentIntentResult.clientSecret, {
-              payment_method: {
-                card: cardElement,
-                billing_details: {
-                  email: userData.email,
-                  name: `${formData.firstName} ${formData.lastName}`,
-                  phone: formData.phone,
-                  address: {
-                    line1: selectedAddress.line1 || selectedAddress.address,
-                    city: selectedAddress.city,
-                    postal_code: selectedAddress.postcode,
-                    country: 'GB'
-                  }
-                }
+          const paymentIntentResponse = await fetch(
+            `${API_URL}/payments/create-payment-intent`,
+            {
+              method: "POST",
+              headers: { 
+                "Content-Type": "application/json",
+                "Accept": "application/json"
               },
-              return_url: `${window.location.origin}/order-success/${orderId}`
-            });
-            
-          } else if (selectedCard) {
-            
-            // For saved cards, we need to check if payment intent needs confirmation
-            if (paymentIntentResult.requiresConfirmation || paymentIntentResult.status === 'requires_confirmation') {
-              // Confirm with saved payment method
-              paymentResult = await stripe.confirmCardPayment(paymentIntentResult.clientSecret, {
-                payment_method: selectedCard.id
-              });
-            } else {
-              // If payment intent is already in a confirmable state, we can retrieve it
-              const paymentIntent = await stripe.retrievePaymentIntent(paymentIntentResult.clientSecret);
-              
-              if (paymentIntent.paymentIntent && paymentIntent.paymentIntent.status === 'requires_confirmation') {
-                paymentResult = await stripe.confirmCardPayment(paymentIntentResult.clientSecret, {
-                  payment_method: selectedCard.id
-                });
-              } else {
-                // Payment intent might already be processing or succeeded
-                paymentResult = { paymentIntent: paymentIntent.paymentIntent };
-              }
+              body: JSON.stringify(paymentIntentData)
             }
-          } else {
-            throw new Error("No payment method selected");
-          }
+          );
 
-          if (paymentResult.error) {
-            throw paymentResult.error;
-          }
-
-          // Payment succeeded
-          if (paymentResult.paymentIntent && paymentResult.paymentIntent.status === "succeeded") {
+          // Handle CORS and network errors
+          if (!paymentIntentResponse.ok) {
+            // Check if it's a CORS issue (status 0 or no response)
+            if (paymentIntentResponse.status === 0) {
+              throw new Error("Cannot connect to payment server. This may be a temporary issue. Please try again.");
+            }
             
-            // Deduct wallet amount if any
+            const errorText = await paymentIntentResponse.text();
+            throw new Error(`Payment error: ${paymentIntentResponse.status} - ${errorText}`);
+          }
+
+          const paymentIntentResult = await paymentIntentResponse.json();
+
+          // Check if payment requires additional action
+          if (paymentIntentResult.requiresAction) {
+            // Handle 3D Secure or other authentication
+            const { error: confirmError } = await stripe.handleCardAction(
+              paymentIntentResult.clientSecret
+            );
+            
+            if (confirmError) {
+              throw confirmError;
+            }
+          }
+
+          // If wallet-only payment
+          if (paymentIntentResult.walletOnly) {
+            // Handle as wallet payment
             if (walletAmount > 0 && userData?.uid) {
               const userRef = doc(db, "users", userData.uid);
               await updateDoc(userRef, {
                 walletBalance: walletBalance - walletAmount,
                 updatedAt: serverTimestamp()
               });
-              
             }
-
-            // Update order with payment success
+            
             await updateDoc(orderRef, {
               paymentStatus: "paid",
               orderStatus: "confirmed",
-              stripePaymentIntentId: paymentResult.paymentIntent.id,
-              stripeChargeId: paymentResult.paymentIntent.latest_charge || null,
               verified: true,
               paidAt: serverTimestamp(),
               updatedAt: serverTimestamp()
             });
 
-            // Create order confirmation notification
+            // Create notifications
             await createNotification(userData.uid,
               NotificationTemplates.ORDER_CONFIRMED(orderData.orderNumber, orderData.total)
             );
             
-            // Create payment success notification
-            await createNotification(userData.uid,
-              NotificationTemplates.PAYMENT_SUCCESS(orderData.total, "card")
-            );
-            
-            // Create wallet usage notification if wallet was used
             if (walletAmount > 0) {
               await createNotification(userData.uid,
                 NotificationTemplates.WALLET_USED(
@@ -582,62 +614,229 @@ export default function Checkout() {
             setOrderDetails({
               ...orderData,
               id: orderId,
-              items: orderItems,
-              stripePaymentIntentId: paymentResult.paymentIntent.id
+              items: orderItems
             });
             
             clearCart();
             setOrderConfirmed(true);
-          } else {
-            throw new Error("Payment not completed. Please try again.");
+            setIsPaying(false);
+            setLoading(false);
+            setIsProcessingPayment(false);
+            return;
           }
-        } else {
-          throw new Error("Payment initialization failed. No client secret received.");
-        }
-      } catch (paymentError) {
-        console.error("Payment processing error:", paymentError);
-        
-        // Update order with failure
-        await updateDoc(orderRef, {
-          paymentStatus: "failed",
-          paymentError: paymentError.message || "Payment failed",
-          updatedAt: serverTimestamp()
-        });
-        
-        // Create payment failure notification
-        await createNotification(userData.uid,
-          NotificationTemplates.PAYMENT_FAILED(
-            orderData.total,
-            paymentError.message || "Payment failed"
-          )
-        );
-        
-        // Provide user-friendly error message
-        let userMessage = paymentError.message;
-        if (paymentError.message.includes("Failed to fetch") || paymentError.message.includes("CORS")) {
-          userMessage = "Payment service is temporarily unavailable. Please try wallet payment or try again later.";
-        }
-        
-        throw new Error(userMessage);
-      }
-    }
 
-  } catch (error) {
-    console.error("Order submission error:", error);
-    
-    setAlert({
-      message: error.message || "Failed to process order. Please try again.",
-      type: "error"
-    });
-    
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    
-  } finally {
-    setIsPaying(false);
-    setLoading(false);
-    setIsProcessingPayment(false);
-  }
-};
+          // Handle card payment with Stripe
+          if (paymentIntentResult.clientSecret) {
+            let paymentResult;
+            
+            if (useNewCard) {
+              // New card payment using Stripe Elements
+              if (!stripe || !elements) {
+                throw new Error("Stripe not loaded. Please refresh the page.");
+              }
+              
+              // Create a new payment method with the card elements
+              const { paymentMethod, error: createPaymentMethodError } = await stripe.createPaymentMethod({
+                type: 'card',
+                card: elements.getElement(CardNumberElement),
+                billing_details: {
+                  name: cardHolderName,
+                  email: userData.email,
+                  phone: formData.phone,
+                  address: {
+                    line1: selectedAddress.line1 || selectedAddress.address,
+                    city: selectedAddress.city,
+                    postal_code: selectedAddress.postcode,
+                    country: 'GB'
+                  }
+                }
+              });
+
+              if (createPaymentMethodError) {
+                throw createPaymentMethodError;
+              }
+
+              // Confirm the payment with the new payment method
+              paymentResult = await stripe.confirmCardPayment(
+                paymentIntentResult.clientSecret,
+                {
+                  payment_method: paymentMethod.id,
+                  return_url: `${window.location.origin}/order-success/${orderId}`
+                }
+              );
+              
+            } else if (selectedCard) {
+              
+              // For saved cards, we need to check if payment intent needs confirmation
+              if (paymentIntentResult.requiresConfirmation || paymentIntentResult.status === 'requires_confirmation') {
+                // Confirm with saved payment method
+                paymentResult = await stripe.confirmCardPayment(paymentIntentResult.clientSecret, {
+                  payment_method: selectedCard.id
+                });
+              } else {
+                // If payment intent is already in a confirmable state, we can retrieve it
+                const paymentIntent = await stripe.retrievePaymentIntent(paymentIntentResult.clientSecret);
+                
+                if (paymentIntent.paymentIntent && paymentIntent.paymentIntent.status === 'requires_confirmation') {
+                  paymentResult = await stripe.confirmCardPayment(paymentIntentResult.clientSecret, {
+                    payment_method: selectedCard.id
+                  });
+                } else {
+                  // Payment intent might already be processing or succeeded
+                  paymentResult = { paymentIntent: paymentIntent.paymentIntent };
+                }
+              }
+            } else {
+              throw new Error("No payment method selected");
+            }
+
+            if (paymentResult.error) {
+              throw paymentResult.error;
+            }
+
+            // Payment succeeded
+            if (paymentResult.paymentIntent && paymentResult.paymentIntent.status === "succeeded") {
+              
+              // Deduct wallet amount if any
+              if (walletAmount > 0 && userData?.uid) {
+                const userRef = doc(db, "users", userData.uid);
+                await updateDoc(userRef, {
+                  walletBalance: walletBalance - walletAmount,
+                  updatedAt: serverTimestamp()
+                });
+                
+              }
+
+              // Update order with payment success
+              await updateDoc(orderRef, {
+                paymentStatus: "paid",
+                orderStatus: "confirmed",
+                stripePaymentIntentId: paymentResult.paymentIntent.id,
+                stripeChargeId: paymentResult.paymentIntent.latest_charge || null,
+                verified: true,
+                paidAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+              });
+
+              // Save card if requested
+              if (saveNewCard && useNewCard && paymentResult.paymentIntent.payment_method) {
+                try {
+                  // Get payment method details
+                  const paymentMethodResponse = await fetch(
+                    `${API_URL}/payments/payment-method/${paymentResult.paymentIntent.payment_method}`
+                  );
+                  
+                  if (paymentMethodResponse.ok) {
+                    const paymentMethod = await paymentMethodResponse.json();
+                    
+                    const userRef = doc(db, "users", userData.uid);
+                    const cardData = {
+                      id: paymentMethod.id,
+                      brand: paymentMethod.card.brand,
+                      last4: paymentMethod.card.last4,
+                      expMonth: paymentMethod.card.exp_month,
+                      expYear: paymentMethod.card.exp_year,
+                      isDefault: savedCards.length === 0,
+                      createdAt: new Date().toISOString()
+                    };
+                    
+                    await updateDoc(userRef, {
+                      savedCards: arrayUnion(cardData),
+                      ...(savedCards.length === 0 && { defaultPaymentMethod: paymentMethod.id }),
+                      updatedAt: serverTimestamp()
+                    });
+                    
+                    // Create card added notification
+                    await createNotification(userData.uid,
+                      NotificationTemplates.CARD_ADDED(paymentMethod.card.last4, paymentMethod.card.brand)
+                    );
+                  }
+                } catch (error) {
+                  console.error("Error saving card:", error);
+                  // Don't fail the order if card saving fails
+                }
+              }
+
+              // Create order confirmation notification
+              await createNotification(userData.uid,
+                NotificationTemplates.ORDER_CONFIRMED(orderData.orderNumber, orderData.total)
+              );
+              
+              // Create payment success notification
+              await createNotification(userData.uid,
+                NotificationTemplates.PAYMENT_SUCCESS(orderData.total, "card")
+              );
+              
+              // Create wallet usage notification if wallet was used
+              if (walletAmount > 0) {
+                await createNotification(userData.uid,
+                  NotificationTemplates.WALLET_USED(
+                    walletAmount,
+                    walletBalance - walletAmount,
+                    orderData.orderNumber
+                  )
+                );
+              }
+
+              setOrderDetails({
+                ...orderData,
+                id: orderId,
+                items: orderItems,
+                stripePaymentIntentId: paymentResult.paymentIntent.id
+              });
+              
+              clearCart();
+              setOrderConfirmed(true);
+            } else {
+              throw new Error("Payment not completed. Please try again.");
+            }
+          } else {
+            throw new Error("Payment initialization failed. No client secret received.");
+          }
+        } catch (paymentError) {
+          console.error("Payment processing error:", paymentError);
+          
+          // Update order with failure
+          await updateDoc(orderRef, {
+            paymentStatus: "failed",
+            paymentError: paymentError.message || "Payment failed",
+            updatedAt: serverTimestamp()
+          });
+          
+          // Create payment failure notification
+          await createNotification(userData.uid,
+            NotificationTemplates.PAYMENT_FAILED(
+              orderData.total,
+              paymentError.message || "Payment failed"
+            )
+          );
+          
+          // Provide user-friendly error message
+          let userMessage = paymentError.message;
+          if (paymentError.message.includes("Failed to fetch") || paymentError.message.includes("CORS")) {
+            userMessage = "Payment service is temporarily unavailable. Please try wallet payment or try again later.";
+          }
+          
+          throw new Error(userMessage);
+        }
+      }
+
+    } catch (error) {
+      console.error("Order submission error:", error);
+      
+      setAlert({
+        message: error.message || "Failed to process order. Please try again.",
+        type: "error"
+      });
+      
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      
+    } finally {
+      setIsPaying(false);
+      setLoading(false);
+      setIsProcessingPayment(false);
+    }
+  };
 
   const formatCurrency = (amount) => {
     if (amount === undefined || amount === null) return "£0.00";
@@ -674,7 +873,7 @@ export default function Checkout() {
         <UserNavBar 
           toggleSidebar={toggleSidebars} 
           isSideBarOpen={isSidebarOpen}
-          user={userData}
+          userData={userData}
         />
         <UserSideBar 
           isOpen={isSidebarOpen} 
@@ -684,8 +883,8 @@ export default function Checkout() {
           activeTab={activeTab}
         />
         
-        <div className="md:flex md:justify-end">
-          <div className={`pt-32 px-5 ${isSidebarOpen ? "md:w-[70%] lg:w-[75%]" : "md:w-full"} transition-all duration-500`}>
+        <div className="lg:flex lg:justify-end">
+          <div className={`pt-32 px-5 ${isSidebarOpen ? "lg:w-[75%]" : "lg:w-full"} transition-all duration-500`}>
             <div className="max-w-4xl mx-auto">
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
@@ -864,7 +1063,7 @@ export default function Checkout() {
       <UserNavBar 
         toggleSidebar={toggleSidebars} 
         isSideBarOpen={isSidebarOpen}
-        user={userData}
+        userData={userData}
       />
       <UserSideBar 
         isOpen={isSidebarOpen} 
@@ -874,8 +1073,8 @@ export default function Checkout() {
         activeTab={activeTab}
       />
       
-      <div className="md:flex md:justify-end">
-        <div className={`pt-32 px-5 ${isSidebarOpen ? "md:w-[70%] lg:w-[75%]" : "md:w-full"} transition-all duration-500`}>
+      <div className="lg:flex lg:justify-end">
+        <div className={`pt-32 px-5 ${isSidebarOpen ? "lg:w-[75%]" : "lg:w-full"} transition-all duration-500`}>
           <div className="max-w-7xl mx-auto pb-12 sm:px-6 lg:px-8">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-3">
@@ -1151,39 +1350,21 @@ export default function Checkout() {
                                       <span className="text-black font-medium">Credit/Debit Card</span>
                                       <p className="text-sm text-gray-600">Pay securely with your card</p>
                                     </div>
-                                    <div className="flex gap-2">
-                                      <span className="px-2 py-1 bg-gray-300 text-xs rounded">Visa</span>
-                                      <span className="px-2 py-1 bg-gray-300 text-xs rounded">MasterCard</span>
-                                      <span className="px-2 py-1 bg-gray-300 text-xs rounded">Amex</span>
+                                    {/* Colorful card brand icons */}
+                                    <div className="flex gap-1">
+                                      <div className="w-8 h-5 bg-gradient-to-r from-blue-400 to-blue-600 rounded flex items-center justify-center">
+                                        <FontAwesomeIcon icon={faCcVisa} className="text-white text-xs" />
+                                      </div>
+                                      <div className="w-8 h-5 bg-gradient-to-r from-red-400 to-red-600 rounded flex items-center justify-center">
+                                        <FontAwesomeIcon icon={faCcMastercard} className="text-white text-xs" />
+                                      </div>
+                                      <div className="w-8 h-5 bg-gradient-to-r from-green-400 to-green-600 rounded flex items-center justify-center">
+                                        <FontAwesomeIcon icon={faCcAmex} className="text-white text-xs" />
+                                      </div>
+                                      <div className="w-8 h-5 bg-gradient-to-r from-orange-400 to-orange-600 rounded flex items-center justify-center">
+                                        <FontAwesomeIcon icon={faCcDiscover} className="text-white text-xs" />
+                                      </div>
                                     </div>
-                                  </div>
-                                </label>
-                              </div>
-                            </div>
-                            
-                            {/* PayPal Option */}
-                            <div className={`p-4 border rounded-xl cursor-pointer transition-all ${
-                              formData.paymentMethod === "paypal" 
-                                ? 'border-own-2 bg-own-2/5' 
-                                : 'border-gray-300 hover:border-own-2'
-                            }`}>
-                              <div className="flex items-start gap-3">
-                                <input
-                                  type="radio"
-                                  id="paypal"
-                                  name="paymentMethod"
-                                  value="paypal"
-                                  checked={formData.paymentMethod === "paypal"}
-                                  onChange={handleInputChange}
-                                  className="mt-1 text-own-2 focus:ring-own-2"
-                                />
-                                <label htmlFor="paypal" className="flex-1 cursor-pointer">
-                                  <div className="flex items-center justify-between">
-                                    <div>
-                                      <span className="text-black font-medium">PayPal</span>
-                                      <p className="text-sm text-gray-600">Fast and secure online payments</p>
-                                    </div>
-                                    <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">Popular</span>
                                   </div>
                                 </label>
                               </div>
@@ -1200,44 +1381,87 @@ export default function Checkout() {
                             >
                               <h3 className="text-lg font-medium text-gray-800 mb-4">Select Card</h3>
                               
-                              <div className="space-y-3 mb-4">
-                                {savedCards.length > 0 ? (
-                                  savedCards.map(card => (
+                              {savedCards.length > 0 ? (
+                                <div className="space-y-3 mb-4">
+                                  {savedCards.map(card => (
                                     <label
                                       key={card.id}
                                       className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer ${
-                                        selectedCard?.id === card.id
+                                        selectedCard?.id === card.id && !useNewCard
                                           ? "border-own-2 bg-amber-50"
                                           : "border-gray-200 hover:border-own-2"
                                       }`}
                                     >
-                                      <div>
-                                        <p className="font-semibold capitalize text-black">
-                                          {card.brand} •••• {card.last4}
-                                        </p>
-                                        <p className="text-sm text-gray-500">
-                                          Expires {card.expMonth}/{card.expYear}
-                                        </p>
+                                      <div className="flex items-center">
+                                        <div className={`w-10 h-6 rounded mr-3 flex items-center justify-center ${
+                                          card.brand === 'visa' ? 'bg-gradient-to-r from-blue-400 to-blue-600' :
+                                          card.brand === 'mastercard' ? 'bg-gradient-to-r from-red-400 to-red-600' :
+                                          card.brand === 'amex' ? 'bg-gradient-to-r from-green-400 to-green-600' :
+                                          card.brand === 'discover' ? 'bg-gradient-to-r from-orange-400 to-orange-600' :
+                                          card.brand === 'diners' ? 'bg-gradient-to-r from-purple-400 to-purple-600' :
+                                          card.brand === 'jcb' ? 'bg-gradient-to-r from-pink-400 to-pink-600' :
+                                          'bg-gradient-to-r from-gray-400 to-gray-600'
+                                        }`}>
+                                          <span className="text-xs text-white font-bold">
+                                            {card.brand === 'visa' ? 'VISA' :
+                                             card.brand === 'mastercard' ? 'MC' :
+                                             card.brand === 'amex' ? 'AMEX' :
+                                             card.brand === 'discover' ? 'DISC' :
+                                             card.brand === 'diners' ? 'DC' :
+                                             card.brand === 'jcb' ? 'JCB' : 'CARD'}
+                                          </span>
+                                        </div>
+                                        <div>
+                                          <p className="font-semibold text-black">
+                                            •••• {card.last4}
+                                          </p>
+                                          <p className="text-sm text-gray-500">
+                                            Expires {card.expMonth.toString().padStart(2, '0')}/{card.expYear.toString().slice(-2)}
+                                          </p>
+                                        </div>
                                       </div>
 
-                                      <input
-                                        type="radio"
-                                        name="selectedCard"
-                                        checked={selectedCard?.id === card.id}
-                                        onChange={() => {
-                                          setSelectedCard(card);
-                                          setUseNewCard(false);
-                                        }}
-                                        className="text-own-2"
-                                      />
+                                      <div className="flex items-center gap-2">
+                                        {card.id === defaultCardId && (
+                                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                                            Default
+                                          </span>
+                                        )}
+                                        <input
+                                          type="radio"
+                                          name="selectedCard"
+                                          checked={selectedCard?.id === card.id && !useNewCard}
+                                          onChange={() => {
+                                            setSelectedCard(card);
+                                            setUseNewCard(false);
+                                          }}
+                                          className="text-own-2"
+                                        />
+                                      </div>
                                     </label>
-                                  ))
-                                ) : (
-                                  <div className="text-center py-4 text-gray-500">
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-center py-6 border-2 border-dashed border-gray-300 rounded-xl mb-4">
+                                  <FontAwesomeIcon icon={faCreditCard} className="text-4xl text-gray-300 mb-3" />
+                                  <h4 className="text-lg font-semibold text-gray-600 mb-2">
                                     No saved cards
-                                  </div>
-                                )}
-                              </div>
+                                  </h4>
+                                  <p className="text-gray-500 mb-4 max-w-md mx-auto">
+                                    You don't have any saved cards. Please add a card to continue with card payment.
+                                  </p>
+                                  <Link
+                                    to="/user/payments"
+                                    className="inline-flex items-center gap-2 bg-own-2 text-white px-6 py-3 rounded-xl hover:bg-amber-600 transition-colors"
+                                  >
+                                    <FontAwesomeIcon icon={faPlusCircle} />
+                                    Add Payment Method
+                                  </Link>
+                                  <p className="text-sm text-gray-500 mt-3">
+                                    You'll be redirected back here after adding a card
+                                  </p>
+                                </div>
+                              )}
 
                               <div className="mt-4">
                                 <button
@@ -1253,28 +1477,116 @@ export default function Checkout() {
                               </div>
 
                               {useNewCard && (
-                                <div className="mt-4">
-                                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Card Details
-                                  </label>
-                                  <div className="p-4 border rounded-xl bg-gray-50">
-                                    <CardElement
-                                      options={{
-                                        style: {
-                                          base: {
-                                            fontSize: "16px",
-                                            color: "#000",
-                                            "::placeholder": { color: "#a0aec0" }
-                                          },
-                                          invalid: { color: "#e53e3e" }
-                                        },
-                                        hidePostalCode: true
-                                      }}
+                                <div className="mt-6 space-y-4">
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                      Cardholder Name
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={cardHolderName}
+                                      onChange={(e) => setCardHolderName(e.target.value)}
+                                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-own-2 focus:border-transparent text-black"
+                                      placeholder="Name on card"
+                                      required
                                     />
                                   </div>
-                                  <p className="text-xs text-gray-500 mt-2">
-                                    Your card details are securely processed by Stripe
-                                  </p>
+
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                      Card Number
+                                    </label>
+                                    <div className="p-4 border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-own-2 focus-within:border-transparent">
+                                      <CardNumberElement
+                                        options={{
+                                          placeholder: "4242 4242 4242 4242",
+                                          style: {
+                                            base: {
+                                              fontSize: "16px",
+                                              color: "#32325d",
+                                              fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+                                              "::placeholder": { color: "#a0aec0" },
+                                            },
+                                            invalid: {
+                                              color: "#e53e3e",
+                                            },
+                                          },
+                                        }}
+                                        onChange={(e) => handleCardElementChange(e, 'cardNumber')}
+                                      />
+                                    </div>
+                                    {detectedCardType && (
+                                      <div className="mt-2">
+                                        <CardBrandDisplay cardType={detectedCardType} />
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Expiry Date
+                                      </label>
+                                      <div className="p-4 border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-own-2 focus-within:border-transparent">
+                                        <CardExpiryElement
+                                          options={{
+                                            placeholder: "MM/YY",
+                                            style: {
+                                              base: {
+                                                fontSize: "16px",
+                                                color: "#32325d",
+                                                fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+                                                "::placeholder": { color: "#a0aec0" },
+                                              },
+                                              invalid: {
+                                                color: "#e53e3e",
+                                              },
+                                            },
+                                          }}
+                                          onChange={(e) => handleCardElementChange(e, 'cardExpiry')}
+                                        />
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        CVC
+                                      </label>
+                                      <div className="p-4 border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-own-2 focus-within:border-transparent">
+                                        <CardCvcElement
+                                          options={{
+                                            placeholder: "123",
+                                            style: {
+                                              base: {
+                                                fontSize: "16px",
+                                                color: "#32325d",
+                                                fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+                                                "::placeholder": { color: "#a0aec0" },
+                                              },
+                                              invalid: {
+                                                color: "#e53e3e",
+                                              },
+                                            },
+                                          }}
+                                          onChange={(e) => handleCardElementChange(e, 'cardCvc')}
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="mt-4">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={saveNewCard}
+                                        onChange={(e) => setSaveNewCard(e.target.checked)}
+                                        className="rounded text-own-2 focus:ring-own-2"
+                                      />
+                                      <span className="text-sm text-gray-700">Save this card for future purchases</span>
+                                    </label>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                      Your card details are securely stored and encrypted
+                                    </p>
+                                  </div>
                                 </div>
                               )}
                             </motion.div>
@@ -1298,7 +1610,14 @@ export default function Checkout() {
                             </div>
                           )}
                           
-                          {formData.paymentMethod === "card" && !selectedCard && !useNewCard && (
+                          {formData.paymentMethod === "card" && savedCards.length === 0 && !useNewCard && (
+                            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+                              <FontAwesomeIcon icon={faExclamationTriangle} className="mr-2" />
+                              No saved cards found. Please add a card or select "Use a new card" option.
+                            </div>
+                          )}
+                          
+                          {formData.paymentMethod === "card" && savedCards.length > 0 && !selectedCard && !useNewCard && (
                             <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
                               <FontAwesomeIcon icon={faExclamationTriangle} className="mr-2" />
                               Please select a card or add a new one.
@@ -1332,12 +1651,16 @@ export default function Checkout() {
                                 availableCartItems.length === 0 || 
                                 !selectedAddress || 
                                 (formData.paymentMethod === "wallet" && !isWalletSufficient()) ||
-                                (formData.paymentMethod === "card" && !selectedCard && !useNewCard)
+                                (formData.paymentMethod === "card" && savedCards.length === 0 && !useNewCard) ||
+                                (formData.paymentMethod === "card" && savedCards.length > 0 && !selectedCard && !useNewCard) ||
+                                (formData.paymentMethod === "card" && useNewCard && (!cardHolderName || !cardElementComplete.cardNumber || !cardElementComplete.cardExpiry || !cardElementComplete.cardCvc))
                               }
                               className={`flex-1 py-4 font-bold rounded-xl transition-colors shadow-md flex items-center justify-center gap-2 ${
                                 loading || isPaying || availableCartItems.length === 0 || !selectedAddress || 
                                 (formData.paymentMethod === "wallet" && !isWalletSufficient()) ||
-                                (formData.paymentMethod === "card" && !selectedCard && !useNewCard)
+                                (formData.paymentMethod === "card" && savedCards.length === 0 && !useNewCard) ||
+                                (formData.paymentMethod === "card" && savedCards.length > 0 && !selectedCard && !useNewCard) ||
+                                (formData.paymentMethod === "card" && useNewCard && (!cardHolderName || !cardElementComplete.cardNumber || !cardElementComplete.cardExpiry || !cardElementComplete.cardCvc))
                                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                   : 'bg-own-2 text-white hover:bg-amber-600'
                               }`}
