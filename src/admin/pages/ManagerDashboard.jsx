@@ -648,7 +648,12 @@ export default function ManagerDashboard() {
       }
 
       // Calculate stats
-      const totalRevenue = ordersList.reduce((sum, order) => sum + (order.total || 0), 0);
+      const totalRevenue = ordersList.reduce((sum, order) => {
+        // Only count revenue if payment status is 'paid'
+        return (order.paymentStatus === 'paid' || order.paymentStatus === 'deposit_paid') 
+          ? sum + (order.total || 0) 
+          : sum;
+      }, 0);
       const pendingOrders = ordersList.filter(order => order.orderStatus === 'pending' || order.orderStatus === 'preparing').length;
       const pendingCateringRequests = cateringRequestsList.filter(req => req.status === 'pending').length;
       
@@ -915,15 +920,6 @@ export default function ManagerDashboard() {
                         </div>
                       )}
                     </div>
-                    {featuredDishes.length > 0 && (
-                      <div className="mt-4">
-                        <Link to="/admin/featured-dishes" className="block w-full text-center py-2 border border-own-2 text-own-2 rounded-xl hover:bg-amber-50 transition-colors text-sm">
-                          <button>
-                            Manage All Featured Dishes
-                          </button>
-                        </Link>
-                      </div>
-                    )}
                   </div>
 
                   {/* Quick Actions & Recent Menu Items */}
@@ -936,11 +932,11 @@ export default function ManagerDashboard() {
                         </button>
                       </Link>
 
-                      <Link to="/admin/featured-dishes" className="p-3 border border-own-2 text-own-2 text-center rounded-xl hover:bg-amber-50 transition-colors text-sm">
+                      {/* <Link to="/admin/menu" className="p-3 border border-own-2 text-own-2 text-center rounded-xl hover:bg-amber-50 transition-colors text-sm">
                         <button>
                           Manage Featured
                         </button>
-                      </Link>
+                      </Link> */}
 
                       <Link to="/admin/orders" className="p-3 border border-own-2 text-own-2 text-center rounded-xl hover:bg-amber-50 transition-colors text-sm">
                         <button>
@@ -948,11 +944,11 @@ export default function ManagerDashboard() {
                         </button>
                       </Link>
 
-                      <Link to="/admin/catering" className="p-3 border border-own-2 text-own-2 text-center rounded-xl hover:bg-amber-50 transition-colors text-sm">
+                      {/* <Link to="/admin/catering" className="p-3 border border-own-2 text-own-2 text-center rounded-xl hover:bg-amber-50 transition-colors text-sm">
                         <button>
                           Catering Packages
                         </button>
-                      </Link>
+                      </Link> */}
 
                       <Link to="/admin/gallery" className="p-3 border border-own-2 text-own-2 text-center rounded-xl hover:bg-amber-50 transition-colors text-sm">
                         <button>

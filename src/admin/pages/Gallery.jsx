@@ -388,7 +388,7 @@ export default function Gallery() {
               
               <div className="relative">
                 <select
-                  className="appearance-none pl-4 pr-10 py-3 border text-black border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
+                  className="appearance-none w-full pl-4 pr-10 py-3 border text-black border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
                 >

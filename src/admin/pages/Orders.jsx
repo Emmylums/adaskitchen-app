@@ -70,7 +70,51 @@ export default function Orders() {
       currency: 'GBP',
       minimumFractionDigits: 2
     }).format(amount / 100);
-  };
+  }; 
+
+  // Date helper functions
+  // Replace the existing date helper functions with these corrected versions:
+
+// Date helper functions - Fixed
+const isToday = (date) => {
+  if (!date) return false;
+  const today = new Date();
+  const orderDate = new Date(date);
+  
+  return orderDate.getDate() === today.getDate() &&
+         orderDate.getMonth() === today.getMonth() &&
+         orderDate.getFullYear() === today.getFullYear();
+};
+
+const isThisWeek = (date) => {
+  if (!date) return false;
+  const orderDate = new Date(date);
+  const now = new Date();
+  
+  // Create a copy of now for startOfWeek calculation
+  const nowCopy = new Date(now);
+  const startOfWeek = new Date(nowCopy.setDate(nowCopy.getDate() - nowCopy.getDay()));
+  startOfWeek.setHours(0, 0, 0, 0);
+  
+  // Create a copy of now for endOfWeek calculation
+  const nowCopy2 = new Date(now);
+  const endOfWeek = new Date(nowCopy2.setDate(nowCopy2.getDate() - nowCopy2.getDay() + 6));
+  endOfWeek.setHours(23, 59, 59, 999);
+  
+  orderDate.setHours(12, 0, 0, 0); // Set to noon to avoid timezone issues
+  
+  return orderDate >= startOfWeek && orderDate <= endOfWeek;
+};
+
+const isThisMonth = (date) => {
+  if (!date) return false;
+  const orderDate = new Date(date);
+  const now = new Date();
+  
+  return orderDate.getMonth() === now.getMonth() && 
+         orderDate.getFullYear() === now.getFullYear();
+};
+
 
   // Mock user data
   const userData = {
@@ -493,43 +537,49 @@ export default function Orders() {
   };
 
   // Filter orders based on search, status, and date
-  const filteredOrders = orders.filter(order => {
-    const matchesSearch = 
-      order.orderNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.customerPhone?.includes(searchTerm) ||
-      order.deliveryAddress?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === "all" || order.orderStatus === statusFilter;
-    
-    const matchesDate = dateFilter === "all" || 
-      (dateFilter === "today" && isToday(order.createdAt)) ||
-      (dateFilter === "week" && isThisWeek(order.createdAt)) ||
-      (dateFilter === "month" && isThisMonth(order.createdAt));
-    
-    return matchesSearch && matchesStatus && matchesDate;
-  });
+  // Replace the filteredOrders calculation with this improved version:
+const filteredOrders = orders.filter(order => {
+  if (!order || !order.createdAt) return false;
+  
+  const searchTermLower = searchTerm.toLowerCase();
+  const matchesSearch = 
+    !searchTerm ||
+    (order.orderNumber && order.orderNumber.toLowerCase().includes(searchTermLower)) ||
+    (order.customerName && order.customerName.toLowerCase().includes(searchTermLower)) ||
+    (order.customerPhone && order.customerPhone.includes(searchTerm)) ||
+    (order.deliveryAddress && 
+      (typeof order.deliveryAddress === 'string' 
+        ? order.deliveryAddress.toLowerCase().includes(searchTermLower)
+        : order.deliveryAddress.address && order.deliveryAddress.address.toLowerCase().includes(searchTermLower)
+      )
+    );
+  
+  const matchesStatus = statusFilter === "all" || order.orderStatus === statusFilter;
+  
+  // Convert to Date object if it's not already
+  const orderDate = order.createdAt instanceof Date ? order.createdAt : new Date(order.createdAt);
+  
+  let matchesDate = true;
+  if (dateFilter !== "all") {
+    switch (dateFilter) {
+      case "today":
+        matchesDate = isToday(orderDate);
+        break;
+      case "week":
+        matchesDate = isThisWeek(orderDate);
+        break;
+      case "month":
+        matchesDate = isThisMonth(orderDate);
+        break;
+      default:
+        matchesDate = true;
+    }
+  }
+  
+  return matchesSearch && matchesStatus && matchesDate;
+});
 
-  // Date helper functions
-  const isToday = (date) => {
-    const today = new Date();
-    return date.getDate() === today.getDate() &&
-           date.getMonth() === today.getMonth() &&
-           date.getFullYear() === today.getFullYear();
-  };
-
-  const isThisWeek = (date) => {
-    const now = new Date();
-    const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()));
-    const endOfWeek = new Date(now.setDate(now.getDate() + 6));
-    return date >= startOfWeek && date <= endOfWeek;
-  };
-
-  const isThisMonth = (date) => {
-    const now = new Date();
-    return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-  };
-
+  
   // Get status color
   const getStatusColor = (status) => {
     switch (status) {
@@ -598,7 +648,12 @@ export default function Orders() {
     delivered: orders.filter(o => o.orderStatus === 'delivered' || o.orderStatus === 'completed').length,
     cancelled: orders.filter(o => o.orderStatus === 'cancelled').length,
     today: orders.filter(o => isToday(o.createdAt)).length,
-    revenue: orders.reduce((sum, o) => sum + (o.total || 0), 0)
+    revenue: orders.reduce((sum, order) => {
+        // Only count revenue if payment status is 'paid'
+        return (order.paymentStatus === 'paid' || order.paymentStatus === 'deposit_paid') 
+          ? sum + (order.total || 0) 
+          : sum;
+      }, 0)
   };
 
   return (
@@ -1033,7 +1088,7 @@ export default function Orders() {
                               <div>
                                 <div className="font-medium text-own-2">{item.name}</div>
                                 <div className="text-sm text-gray-500">
-                                  {formatCurrency(item.price *100)} × {item.quantity} = {formatCurrency(item.total*100)}
+                                  {formatCurrency(item.price)} × {item.quantity} = {formatCurrency(item.total)}
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
@@ -1066,7 +1121,7 @@ export default function Orders() {
                     <div className="space-y-2">
                       <div className="flex justify-between text-black">
                         <span>Subtotal:</span>
-                        <span>{formatCurrency(orderForm.subtotal*100)}</span>
+                        <span>{formatCurrency(orderForm.subtotal)}</span>
                       </div>
                       
                       <div className="flex justify-between text-black">
@@ -1109,7 +1164,7 @@ export default function Orders() {
                       <div className="border-t border-gray-300 pt-2 mt-2 text-black">
                         <div className="flex justify-between font-bold text-lg">
                           <span>Total:</span>
-                          <span className="text-own-2">{formatCurrency(orderForm.total*100)}</span>
+                          <span className="text-own-2">{formatCurrency(orderForm.total)}</span>
                         </div>
                       </div>
                     </div>

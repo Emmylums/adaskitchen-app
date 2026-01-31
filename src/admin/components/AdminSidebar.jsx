@@ -185,10 +185,10 @@ const AdminSideBar = ({ isOpen, closeSidebar, activeTab, setActiveTab }) => {
             opacity: isOpen ? 1 : 0 
           }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="fixed top-0 left-0 h-full bg-own-2 shadow-xl z-40 lg:relative lg:left-0 lg:shadow-none lg:z-0 pb-20 md:pb-0"
+          className="fixed top-0 left-0 h-full bg-white shadow-xl z-40 lg:relative lg:left-0 lg:shadow-none lg:z-0 pb-20 md:pb-0"
         >
           <div className="flex justify-between items-center p-4 border-b lg:hidden">
-            <span className="font-bold text-white text-lg">Admin Panel</span>
+            <span className="font-bold text-own-2 text-lg">Admin Panel</span>
             <button onClick={closeSidebar} className="text-black text-lg">
               <FontAwesomeIcon icon={faTimes}/>
             </button>
@@ -196,42 +196,32 @@ const AdminSideBar = ({ isOpen, closeSidebar, activeTab, setActiveTab }) => {
           
           {/* Scrollable content with hidden scrollbar */}
           <div className="h-full overflow-y-auto p-6 sidebar-scroll">
-            <h1 className="text-white font-bold text-2xl pb-5 pt-3 hidden md:block">Admin Panel</h1>
+            <h1 className="text-own-2 font-bold text-2xl pb-5 pt-3 hidden md:block text-center">Admin Panel</h1>
             
-            {/* User Profile Section */}
-            <div className="mt-5 flex mb-10 rounded-xl p-3.5 items-center bg-amber-600">
-              {loading ? (
-                <div className="flex items-center w-full">
-                  <div className="w-10 h-10 mr-5 bg-white rounded-full animate-pulse"></div>
-                  <div className="flex-1">
-                    <div className="h-4 bg-white/50 rounded w-3/4 mb-2 animate-pulse"></div>
-                    <div className="h-3 bg-white/30 rounded w-1/2 animate-pulse"></div>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {userData.photoURL ? (
-                    <div className="w-10 h-10 mr-5 bg-white rounded-full flex items-center justify-center overflow-hidden">
-                      <img 
-                        src={userData.photoURL} 
-                        alt={userData.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  ) : (
-                    <div className="w-10 h-10 mr-5 bg-white rounded-full flex items-center justify-center">
-                      <FontAwesomeIcon icon={faUser} className="text-xl text-amber-600" />
-                    </div>
-                  )}
-                  <div>
-                    <h3 className="font-bold text-white mb-0.5">{userData.name}</h3>
-                    <p className="text-xs text-white mb-0.5">{userData.email}</p>
-                    <p className="text-xs text-white font-bold uppercase">
-                      {userData.position === "customer" ? "Customer" : userData.position}
-                    </p>
-                  </div>
-                </>
-              )}
+            {/* User Profile Section - Updated to match UserSidebar */}
+            <div className="text-center mb-6">
+              <div className="w-20 h-20 mx-auto mb-4 bg-own-2 rounded-full flex items-center justify-center overflow-hidden">
+                {loading ? (
+                  <div className="w-full h-full bg-gray-200 animate-pulse rounded-full"></div>
+                ) : userData.photoURL ? (
+                  <img 
+                    src={userData.photoURL} 
+                    alt={userData.name || "Admin User"}
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                ) : (
+                  <FontAwesomeIcon icon={faUser} className="text-3xl text-white" />
+                )}
+              </div>
+              <h3 className="text-lg font-bold text-own-2">
+                {userData.name || "Welcome!"}
+              </h3>
+              <p className="text-sm text-gray-600">
+                {userData.email || "Admin User"}
+              </p>
+              <p className="text-xs text-gray-500 font-bold uppercase mt-1">
+                {userData.position === "customer" ? "Customer" : userData.position || "Manager"}
+              </p>
             </div>
 
             {/* Navigation Menu */}
@@ -243,14 +233,14 @@ const AdminSideBar = ({ isOpen, closeSidebar, activeTab, setActiveTab }) => {
                       setActiveTab(item.id);
                       closeSidebar();
                     }}
-                    className={`w-full text-left px-4 py-3 rounded-xl transition-colors mb-3 ${
+                    className={`w-full text-left px-4 py-3 rounded-xl transition-colors mb-3 flex items-center ${
                       activeTab === item.id 
-                        ? "bg-amber-600 hover:bg-amber-800 text-white" 
-                        : "text-white hover:bg-amber-400"
+                        ? "bg-own-2 text-white" 
+                        : "text-gray-700 hover:bg-gray-100"
                     }`}
                   >
-                    <FontAwesomeIcon icon={item.icon} className="mr-3" />
-                    {item.label}
+                    <FontAwesomeIcon icon={item.icon} className="mr-3 w-5" />
+                    <span className="font-medium">{item.label}</span>
                   </button>
                 </Link>
               ))}
@@ -258,10 +248,10 @@ const AdminSideBar = ({ isOpen, closeSidebar, activeTab, setActiveTab }) => {
               {/* Sign Out Button */}
               <button 
                 onClick={handleSignOut}
-                className="w-full text-left px-4 py-3 rounded-xl text-red-600 hover:bg-white transition-colors mt-5"
+                className="w-full text-left px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 transition-colors flex items-center mb-3 mt-5"
               >
-                <FontAwesomeIcon icon={faSignOutAlt} className="mr-3" />
-                Sign Out
+                <FontAwesomeIcon icon={faSignOutAlt} className="mr-3 w-5" />
+                <span className="font-medium">Sign Out</span>
               </button>
             </nav>
 
@@ -273,15 +263,15 @@ const AdminSideBar = ({ isOpen, closeSidebar, activeTab, setActiveTab }) => {
                     <FontAwesomeIcon icon={faClock} className="text-white" />
                   </div>
                   <h4 className="font-semibold text-gray-800 mb-2">Last Login</h4>
-                  <p className="text-sm text-gray-600 mb-1">
+                  <p className="text-sm text-gray-600 mb-1 flex items-center justify-center">
                     <FontAwesomeIcon icon={faCalendarAlt} className="mr-2 text-own-2" />
                     {lastLogin.date}
                   </p>
-                  <p className="text-sm text-gray-600 mb-2">
+                  <p className="text-sm text-gray-600 mb-2 flex items-center justify-center">
                     <FontAwesomeIcon icon={faClock} className="mr-2 text-own-2" />
                     {lastLogin.time}
                   </p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-gray-500 flex items-center justify-center">
                     <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-1" />
                     {userData.loginLocation}
                   </p>
@@ -303,7 +293,7 @@ const AdminSideBar = ({ isOpen, closeSidebar, activeTab, setActiveTab }) => {
               </div>
             )}
 
-            {/* Loading State */}
+            {/* Loading State for Last Login */}
             {loading && (
               <div className="mt-8 p-4 bg-gray-50 rounded-xl">
                 <div className="text-center">
@@ -319,7 +309,7 @@ const AdminSideBar = ({ isOpen, closeSidebar, activeTab, setActiveTab }) => {
 
             {/* Admin Stats (Optional) */}
             {!loading && userData.position !== "customer" && (
-              <div className="mt-6 p-4 bg-amber-50 rounded-xl border border-amber-200">
+              <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
                 <h4 className="font-semibold text-gray-800 mb-2 text-center">Admin Access</h4>
                 <p className="text-xs text-gray-600 text-center">
                   You have full administrative privileges

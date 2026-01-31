@@ -321,7 +321,7 @@ export default function MenuManagement() {
               
               <div className="relative">
                 <select
-                  className="appearance-none pl-3 pr-10 py-2 border border-black text-black rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
+                  className="appearance-none w-full pl-3 pr-10 py-2 border border-black text-black rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
                 >
@@ -330,7 +330,7 @@ export default function MenuManagement() {
                     <option key={cat.id} value={cat.name}>{cat.name}</option>
                   ))}
                 </select>
-                <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                   <FontAwesomeIcon icon={faChevronDown} className="text-black" />
                 </div>
               </div>

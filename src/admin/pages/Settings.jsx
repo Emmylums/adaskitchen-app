@@ -23,14 +23,22 @@ import {
   faEye,
   faEyeSlash,
   faUpload,
-  faTrash
+  faTrash,
+  faClock,
+  faUtensils,
+  faMapMarkerAlt,
+  faLanguage,
+  faMoneyBillWave
 } from '@fortawesome/free-solid-svg-icons';
 import { 
   collection, 
   getDocs, 
   doc, 
   updateDoc,
-  serverTimestamp
+  setDoc,
+  serverTimestamp,
+  getDoc,
+  writeBatch
 } from "firebase/firestore";
 import { db } from "../../firebaseConfig";
 
@@ -59,14 +67,11 @@ export default function Settings() {
 
   // Settings states
   const [settings, setSettings] = useState({
-    // General Settings
-    restaurantName: "AfriKitch Restaurant",
-    restaurantEmail: "info@afrikitch.com",
-    restaurantPhone: "+234 123 456 7890",
-    restaurantAddress: "123 Restaurant Street, Lagos, Nigeria",
-    currency: "NGN",
-    timezone: "Africa/Lagos",
-    language: "en",
+    // Chef Information
+    chefName: "",
+    chefBio: "",
+    chefImageUrl: "",
+    chefImageFile: null,
     
     // Business Hours
     businessHours: {
@@ -86,34 +91,6 @@ export default function Settings() {
       transfer: true,
       wallet: true
     },
-    
-    // Notification Settings
-    notifications: {
-      emailNotifications: true,
-      smsNotifications: false,
-      pushNotifications: true,
-      orderUpdates: true,
-      paymentUpdates: true,
-      marketingEmails: false
-    },
-  });
-
-  const [profile, setProfile] = useState({
-    name: userData.name,
-    email: userData.email,
-    phone: userData.phone,
-    position: userData.position,
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-    profileImage: null,
-    profileImageUrl: ""
-  });
-
-  const [showPassword, setShowPassword] = useState({
-    current: false,
-    new: false,
-    confirm: false
   });
 
   // Fetch settings from Firebase
@@ -124,22 +101,77 @@ export default function Settings() {
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      const settingsRef = collection(db, "settings");
-      const snapshot = await getDocs(settingsRef);
       
-      if (!snapshot.empty) {
-        const settingsData = snapshot.docs[0].data();
-        setSettings(prev => ({ ...prev, ...settingsData }));
+      // Fetch chef information from 'settings' collection
+      try {
+        const settingsRef = doc(db, "settings", "chefInfo");
+        const settingsSnapshot = await getDoc(settingsRef);
+        
+        if (settingsSnapshot.exists()) {
+          const data = settingsSnapshot.data();
+          console.log("Fetched chef data:", data);
+          setSettings(prev => ({ 
+            ...prev, 
+            chefName: data.name || "",
+            chefBio: data.bio || "",
+            chefImageUrl: data.imageUrl || ""
+          }));
+        } else {
+          console.log("No chef info found, using defaults");
+        }
+      } catch (error) {
+        console.error("Error fetching chef information:", error);
       }
       
-      // Fetch profile data
-      const profileRef = collection(db, "users");
-      const profileSnapshot = await getDocs(profileRef);
-      if (!profileSnapshot.empty) {
-        const userProfile = profileSnapshot.docs.find(doc => doc.data().email === userData.email)?.data();
-        if (userProfile) {
-          setProfile(prev => ({ ...prev, ...userProfile }));
+      // Fetch business hours from 'settings' collection
+      try {
+        const hoursRef = doc(db, "settings", "businessHours");
+        const hoursSnapshot = await getDoc(hoursRef);
+        
+        if (hoursSnapshot.exists()) {
+          const hoursData = hoursSnapshot.data();
+          console.log("Fetched business hours:", hoursData);
+          
+          // Merge with existing hours, ensuring all days exist
+          const mergedHours = { ...settings.businessHours };
+          Object.keys(mergedHours).forEach(day => {
+            if (hoursData[day]) {
+              mergedHours[day] = {
+                ...mergedHours[day],
+                ...hoursData[day]
+              };
+            }
+          });
+          
+          setSettings(prev => ({ 
+            ...prev, 
+            businessHours: mergedHours
+          }));
         }
+      } catch (error) {
+        console.error("Error fetching business hours:", error);
+      } 
+      
+      // Fetch payment settings from 'settings' collection
+      try {
+        const paymentRef = doc(db, "settings", "paymentMethods");
+        const paymentSnapshot = await getDoc(paymentRef);
+        
+        if (paymentSnapshot.exists()) {
+          const paymentData = paymentSnapshot.data();
+          console.log("Fetched payment methods:", paymentData);
+          setSettings(prev => ({ 
+            ...prev, 
+            paymentMethods: {
+              cash: paymentData.cash !== undefined ? paymentData.cash : true,
+              card: paymentData.card !== undefined ? paymentData.card : true,
+              transfer: paymentData.transfer !== undefined ? paymentData.transfer : true,
+              wallet: paymentData.wallet !== undefined ? paymentData.wallet : true
+            }
+          }));
+        }
+      } catch (error) {
+        console.error("Error fetching payment settings:", error);
       }
       
     } catch (error) {
@@ -165,69 +197,12 @@ export default function Settings() {
     } else {
       setSettings(prev => ({
         ...prev,
-        [section]: {
-          ...prev[section],
-          [field]: value
-        }
+        [section]: field // Note: field is the value when called directly
       }));
     }
   };
 
-  const handleProfileChange = (field, value) => {
-    setProfile(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const handleSaveSettings = async () => {
-    try {
-      setSaving(true);
-      // In a real app, you would save to Firebase
-      // await updateDoc(doc(db, "settings", "main"), {
-      //   ...settings,
-      //   updatedAt: serverTimestamp()
-      // });
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      alert("Settings saved successfully!");
-    } catch (error) {
-      console.error("Error saving settings:", error);
-      alert("Failed to save settings. Please try again.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSaveProfile = async () => {
-    if (profile.newPassword && profile.newPassword !== profile.confirmPassword) {
-      alert("New passwords do not match!");
-      return;
-    }
-
-    try {
-      setSaving(true);
-      // In a real app, you would save to Firebase
-      // await updateDoc(doc(db, "users", userId), {
-      //   name: profile.name,
-      //   phone: profile.phone,
-      //   position: profile.position,
-      //   updatedAt: serverTimestamp()
-      // });
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      alert("Profile updated successfully!");
-    } catch (error) {
-      console.error("Error saving profile:", error);
-      alert("Failed to update profile. Please try again.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleImageUpload = (e) => {
+  const handleChefImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) { // 5MB limit
@@ -237,129 +212,107 @@ export default function Settings() {
       
       const reader = new FileReader();
       reader.onloadend = () => {
-        setProfile(prev => ({
+        setSettings(prev => ({
           ...prev,
-          profileImage: file,
-          profileImageUrl: reader.result
+          chefImageUrl: reader.result,
+          chefImageFile: file
         }));
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const removeProfileImage = () => {
-    setProfile(prev => ({
+  const removeChefImage = () => {
+    setSettings(prev => ({
       ...prev,
-      profileImage: null,
-      profileImageUrl: ""
+      chefImageUrl: "",
+      chefImageFile: null
     }));
+  };
+
+  const handleSaveSettings = async () => {
+    try {
+      setSaving(true);
+      
+      // Prepare all data to save
+      const chefData = {
+        name: settings.chefName || "",
+        bio: settings.chefBio || "",
+        imageUrl: settings.chefImageUrl || "",
+        updatedAt: serverTimestamp()
+      };
+
+      const businessHoursData = {
+        ...settings.businessHours,
+        updatedAt: serverTimestamp()
+      };
+
+      const paymentData = {
+        ...settings.paymentMethods,
+        updatedAt: serverTimestamp()
+      };
+
+      console.log("Saving chef data:", chefData);
+      console.log("Saving business hours:", businessHoursData);
+      console.log("Saving payment data:", paymentData);
+
+      // Use batch write for atomic operations
+      const batch = writeBatch(db);
+
+      // Save chef information
+      const chefRef = doc(db, "settings", "chefInfo");
+      batch.set(chefRef, chefData, { merge: true });
+
+      // Save business hours
+      const hoursRef = doc(db, "settings", "businessHours");
+      batch.set(hoursRef, businessHoursData, { merge: true });
+
+      // Save payment settings
+      const paymentRef = doc(db, "settings", "paymentMethods");
+      batch.set(paymentRef, paymentData, { merge: true });
+
+      // Commit the batch
+      await batch.commit();
+
+      console.log("All settings saved successfully!");
+      alert("Settings saved successfully!");
+      
+    } catch (error) {
+      console.error("Error saving settings:", error);
+      console.error("Error details:", {
+        code: error.code,
+        message: error.message,
+        stack: error.stack
+      });
+      
+      alert(`Failed to save settings: ${error.message}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const tabs = [
     { id: "General", icon: faStore, label: "General" },
-    { id: "Profile", icon: faUser, label: "Profile" },
     { id: "Payments", icon: faCreditCard, label: "Payments" },
-    { id: "Notifications", icon: faBell, label: "Notifications" },
-    { id: "Advanced", icon: faDatabase, label: "Advanced" }
   ];
 
   const renderGeneralSettings = () => (
     <div className="space-y-6">
+      {/* Chef Information Section */}
       <div className="bg-white rounded-2xl shadow p-6">
-        <h3 className="text-lg font-bold text-own-2 mb-4">Restaurant Information</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Restaurant Name *</label>
-            <input
-              type="text"
-              className="w-full px-4 py-3 border text-black border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
-              value={settings.restaurantName}
-              onChange={(e) => handleSettingChange("restaurantName", e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Email Address *</label>
-            <input
-              type="email"
-              className="w-full px-4 py-3 border text-black border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
-              value={settings.restaurantEmail}
-              onChange={(e) => handleSettingChange("restaurantEmail", e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number *</label>
-            <input
-              type="tel"
-              className="w-full px-4 py-3 border text-black border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
-              value={settings.restaurantPhone}
-              onChange={(e) => handleSettingChange("restaurantPhone", e.target.value)}
-            />
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
-            <textarea
-              rows={2}
-              className="w-full px-4 py-3 border text-black border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
-              value={settings.restaurantAddress}
-              onChange={(e) => handleSettingChange("restaurantAddress", e.target.value)}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl shadow p-6">
-        <h3 className="text-lg font-bold text-own-2 mb-4">Business Hours</h3>
-        <div className="space-y-4 text-black">
-          {Object.entries(settings.businessHours).map(([day, hours]) => (
-            <div key={day} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 text-own-2 rounded"
-                  checked={!hours.closed}
-                  onChange={(e) => handleSettingChange(`businessHours.${day}`, "closed", !e.target.checked)}
-                />
-                <span className="ml-3 capitalize font-medium">{day}</span>
-              </div>
-              {!hours.closed ? (
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="time"
-                    className="px-3 py-2 border border-gray-300 rounded bg-own-2 text-white"
-                    value={hours.open}
-                    onChange={(e) => handleSettingChange(`businessHours.${day}`, "open", e.target.value)}
-                  />
-                  <span>to</span>
-                  <input
-                    type="time"
-                    className="px-3 py-2 border border-gray-300 rounded bg-own-2 text-white"
-                    value={hours.close}
-                    onChange={(e) => handleSettingChange(`businessHours.${day}`, "close", e.target.value)}
-                  />
-                </div>
-              ) : (
-                <span className="text-red-600 font-medium">Closed</span>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderProfileSettings = () => (
-    <div className="space-y-6">
-      <div className="bg-white rounded-2xl shadow p-6">
-        <h3 className="text-lg font-bold text-own-2 mb-4">Profile Information</h3>
+        <h3 className="text-lg font-bold text-own-2 mb-4 flex items-center">
+          <FontAwesomeIcon icon={faUtensils} className="mr-2" />
+          Chef Information
+        </h3>
         
-        {/* Profile Image */}
+        {/* Chef Image */}
         <div className="flex flex-col items-center mb-6">
           <div className="relative">
             <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-own-2">
-              {profile.profileImageUrl ? (
+              {settings.chefImageUrl ? (
                 <img 
-                  src={profile.profileImageUrl} 
-                  alt="Profile" 
+                  src={settings.chefImageUrl} 
+                  alt="Chef" 
                   className="w-full h-full object-cover"
                 />
               ) : (
@@ -369,158 +322,176 @@ export default function Settings() {
               )}
             </div>
             <div className="absolute bottom-0 right-0 flex space-x-2">
-              <label className="cursor-pointer bg-own-2 text-white p-2 rounded-full hover:bg-amber-600">
+              <label className="cursor-pointer bg-own-2 text-white p-2 rounded-full hover:bg-amber-600 transition-colors">
                 <FontAwesomeIcon icon={faUpload} />
                 <input
                   type="file"
                   className="hidden"
                   accept="image/*"
-                  onChange={handleImageUpload}
+                  onChange={handleChefImageUpload}
                 />
               </label>
-              {profile.profileImageUrl && (
+              {settings.chefImageUrl && (
                 <button
-                  onClick={removeProfileImage}
-                  className="bg-red-600 text-white p-2 rounded-full hover:bg-red-700"
+                  onClick={removeChefImage}
+                  className="bg-red-600 text-white p-2 rounded-full hover:bg-red-700 transition-colors"
                 >
                   <FontAwesomeIcon icon={faTrash} />
                 </button>
               )}
             </div>
           </div>
-          <p className="text-sm text-gray-500 mt-2">Click the upload icon to change your profile picture</p>
+          <p className="text-sm text-gray-500 mt-2">Upload chef profile picture (Max 5MB)</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Full Name *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Chef Name *</label>
             <input
               type="text"
-              className="w-full px-4 py-3 border text-black border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
-              value={profile.name}
-              onChange={(e) => handleProfileChange("name", e.target.value)}
+              className="w-full px-4 py-3 border text-black border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2 transition-colors"
+              value={settings.chefName}
+              onChange={(e) => setSettings(prev => ({ ...prev, chefName: e.target.value }))}
+              placeholder="Enter chef's full name"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Position</label>
-            <input
-              type="text"
-              className="w-full px-4 py-3 border text-black border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
-              value={profile.position}
-              onChange={(e) => handleProfileChange("position", e.target.value)} disabled
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Email Address *</label>
-            <input
-              type="email"
-              className="w-full px-4 py-3 border text-black border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
-              value={profile.email}
-              readOnly
-              disabled
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
-            <input
-              type="tel"
-              className="w-full px-4 py-3 border text-black border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
-              value={profile.phone}
-              onChange={(e) => handleProfileChange("phone", e.target.value)}
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Chef Bio *</label>
+            <textarea
+              rows={4}
+              className="w-full px-4 py-3 border text-black border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2 transition-colors"
+              value={settings.chefBio}
+              onChange={(e) => setSettings(prev => ({ ...prev, chefBio: e.target.value }))}
+              placeholder="Tell us about the chef's experience, specialties, and story..."
             />
           </div>
         </div>
       </div>
 
+      {/* Responsive Business Hours Section */}
       <div className="bg-white rounded-2xl shadow p-6">
-        <h3 className="text-lg font-bold text-own-2 mb-4">Change Password</h3>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Current Password</label>
-            <div className="relative">
-              <input
-                type={showPassword.current ? "text" : "password"}
-                className="w-full px-4 py-3 border text-black border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
-                value={profile.currentPassword}
-                onChange={(e) => handleProfileChange("currentPassword", e.target.value)}
-              />
-              <button
-                type="button"
-                className="absolute right-3 top-3 text-gray-500"
-                onClick={() => setShowPassword(prev => ({ ...prev, current: !prev.current }))}
-              >
-                <FontAwesomeIcon icon={showPassword.current ? faEyeSlash : faEye} />
-              </button>
+        <h3 className="text-lg font-bold text-own-2 mb-4 flex items-center">
+          <FontAwesomeIcon icon={faClock} className="mr-2" />
+          Business Hours
+        </h3>
+        <div className="space-y-3 text-black">
+          {Object.entries(settings.businessHours).map(([day, hours]) => (
+            <div key={day} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50 rounded-lg gap-3 hover:bg-gray-100 transition-colors">
+              <div className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  className="h-5 w-5 text-own-2 rounded focus:ring-own-2 cursor-pointer"
+                  checked={!hours.closed}
+                  onChange={(e) => {
+                    const updatedHours = { ...settings.businessHours };
+                    updatedHours[day].closed = !e.target.checked;
+                    setSettings(prev => ({ ...prev, businessHours: updatedHours }));
+                  }}
+                />
+                <span className="capitalize font-medium text-gray-800 min-w-[100px]">
+                  {day.charAt(0).toUpperCase() + day.slice(1)}
+                </span>
+              </div>
+              
+              {!hours.closed ? (
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600 whitespace-nowrap">Open:</span>
+                    <input
+                      type="time"
+                      className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-black focus:ring-2 focus:ring-own-2 focus:border-own-2 w-full sm:w-32 transition-colors"
+                      value={hours.open}
+                      onChange={(e) => {
+                        const updatedHours = { ...settings.businessHours };
+                        updatedHours[day].open = e.target.value;
+                        setSettings(prev => ({ ...prev, businessHours: updatedHours }));
+                      }}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600 whitespace-nowrap">Close:</span>
+                    <input
+                      type="time"
+                      className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-black focus:ring-2 focus:ring-own-2 focus:border-own-2 w-full sm:w-32 transition-colors"
+                      value={hours.close}
+                      onChange={(e) => {
+                        const updatedHours = { ...settings.businessHours };
+                        updatedHours[day].close = e.target.value;
+                        setSettings(prev => ({ ...prev, businessHours: updatedHours }));
+                      }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <span className="text-red-600 font-medium bg-red-50 px-4 py-2 rounded-lg w-full sm:w-auto text-center">
+                  Closed
+                </span>
+              )}
             </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">New Password</label>
-            <div className="relative">
-              <input
-                type={showPassword.new ? "text" : "password"}
-                className="w-full px-4 py-3 border text-black border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
-                value={profile.newPassword}
-                onChange={(e) => handleProfileChange("newPassword", e.target.value)}
-              />
-              <button
-                type="button"
-                className="absolute right-3 top-3 text-gray-500"
-                onClick={() => setShowPassword(prev => ({ ...prev, new: !prev.new }))}
-              >
-                <FontAwesomeIcon icon={showPassword.new ? faEyeSlash : faEye} />
-              </button>
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
-            <div className="relative">
-              <input
-                type={showPassword.confirm ? "text" : "password"}
-                className="w-full px-4 py-3 border text-black border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
-                value={profile.confirmPassword}
-                onChange={(e) => handleProfileChange("confirmPassword", e.target.value)}
-              />
-              <button
-                type="button"
-                className="absolute right-3 top-3 text-gray-500"
-                onClick={() => setShowPassword(prev => ({ ...prev, confirm: !prev.confirm }))}
-              >
-                <FontAwesomeIcon icon={showPassword.confirm ? faEyeSlash : faEye} />
-              </button>
-            </div>
+          ))}
+        </div>
+        
+        {/* Quick Actions for Business Hours */}
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <h4 className="text-sm font-medium text-gray-700 mb-3">Quick Actions</h4>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => {
+                const updatedHours = { ...settings.businessHours };
+                Object.keys(updatedHours).forEach(day => {
+                  updatedHours[day] = { ...updatedHours[day], closed: false };
+                });
+                setSettings(prev => ({ ...prev, businessHours: updatedHours }));
+              }}
+              className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors text-sm font-medium"
+            >
+              Open All Days
+            </button>
+            <button
+              onClick={() => {
+                const updatedHours = { ...settings.businessHours };
+                Object.keys(updatedHours).forEach(day => {
+                  updatedHours[day] = { ...updatedHours[day], closed: true };
+                });
+                setSettings(prev => ({ ...prev, businessHours: updatedHours }));
+              }}
+              className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium"
+            >
+              Close All Days
+            </button>
+            <button
+              onClick={() => {
+                const standardHours = {
+                  monday: { open: "09:00", close: "22:00", closed: false },
+                  tuesday: { open: "09:00", close: "22:00", closed: false },
+                  wednesday: { open: "09:00", close: "22:00", closed: false },
+                  thursday: { open: "09:00", close: "22:00", closed: false },
+                  friday: { open: "09:00", close: "23:00", closed: false },
+                  saturday: { open: "10:00", close: "23:00", closed: false },
+                  sunday: { open: "11:00", close: "21:00", closed: false }
+                };
+                setSettings(prev => ({ ...prev, businessHours: standardHours }));
+              }}
+              className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium"
+            >
+              Set Standard Hours
+            </button>
           </div>
         </div>
       </div>
-
-      <button
-        onClick={handleSaveProfile}
-        disabled={saving}
-        className="w-full bg-own-2 text-white py-3 rounded-xl hover:bg-amber-600 transition-colors disabled:opacity-50 flex items-center justify-center"
-      >
-        {saving ? (
-          <>
-            <FontAwesomeIcon icon={faSpinner} className="animate-spin mr-2" />
-            Saving...
-          </>
-        ) : (
-          <>
-            <FontAwesomeIcon icon={faSave} className="mr-2" />
-            Save Profile Changes
-          </>
-        )}
-      </button>
     </div>
   );
-
 
   const renderPaymentSettings = () => (
     <div className="space-y-6">
       <div className="bg-white rounded-2xl shadow p-6">
         <h3 className="text-lg font-bold text-own-2 mb-4">Payment Methods</h3>
         <div className="space-y-4 text-black">
-          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
             <div className="flex items-center">
-              <FontAwesomeIcon icon={faCreditCard} className="text-own-2 mr-3" />
+              <div className="w-10 h-10 bg-own-2 rounded-lg flex items-center justify-center mr-3">
+                <FontAwesomeIcon icon={faMoneyBillWave} className="text-white" />
+              </div>
               <div>
                 <div className="font-medium">Cash on Delivery</div>
                 <div className="text-sm text-gray-500">Accept cash payments on delivery</div>
@@ -531,15 +502,25 @@ export default function Settings() {
                 type="checkbox"
                 className="sr-only peer"
                 checked={settings.paymentMethods.cash}
-                onChange={(e) => handleSettingChange("paymentMethods", "cash", e.target.checked)}
+                onChange={(e) => {
+                  setSettings(prev => ({
+                    ...prev,
+                    paymentMethods: {
+                      ...prev.paymentMethods,
+                      cash: e.target.checked
+                    }
+                  }));
+                }}
               />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-own-2"></div>
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-own-2 transition-colors"></div>
             </label>
           </div>
 
-          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
             <div className="flex items-center">
-              <FontAwesomeIcon icon={faCreditCard} className="text-blue-500 mr-3" />
+              <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mr-3">
+                <FontAwesomeIcon icon={faCreditCard} className="text-white" />
+              </div>
               <div>
                 <div className="font-medium">Credit/Debit Card</div>
                 <div className="text-sm text-gray-500">Accept card payments online</div>
@@ -550,15 +531,25 @@ export default function Settings() {
                 type="checkbox"
                 className="sr-only peer"
                 checked={settings.paymentMethods.card}
-                onChange={(e) => handleSettingChange("paymentMethods", "card", e.target.checked)}
+                onChange={(e) => {
+                  setSettings(prev => ({
+                    ...prev,
+                    paymentMethods: {
+                      ...prev.paymentMethods,
+                      card: e.target.checked
+                    }
+                  }));
+                }}
               />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500 transition-colors"></div>
             </label>
           </div>
 
-          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
             <div className="flex items-center">
-              <FontAwesomeIcon icon={faGlobe} className="text-green-500 mr-3" />
+              <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center mr-3">
+                <FontAwesomeIcon icon={faGlobe} className="text-white" />
+              </div>
               <div>
                 <div className="font-medium">Bank Transfer</div>
                 <div className="text-sm text-gray-500">Accept bank transfers</div>
@@ -569,15 +560,25 @@ export default function Settings() {
                 type="checkbox"
                 className="sr-only peer"
                 checked={settings.paymentMethods.transfer}
-                onChange={(e) => handleSettingChange("paymentMethods", "transfer", e.target.checked)}
+                onChange={(e) => {
+                  setSettings(prev => ({
+                    ...prev,
+                    paymentMethods: {
+                      ...prev.paymentMethods,
+                      transfer: e.target.checked
+                    }
+                  }));
+                }}
               />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500 transition-colors"></div>
             </label>
           </div>
 
-          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
             <div className="flex items-center">
-              <FontAwesomeIcon icon={faMobileAlt} className="text-purple-500 mr-3" />
+              <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center mr-3">
+                <FontAwesomeIcon icon={faMobileAlt} className="text-white" />
+              </div>
               <div>
                 <div className="font-medium">Wallet Payment</div>
                 <div className="text-sm text-gray-500">Accept payments from customer wallet</div>
@@ -588,188 +589,30 @@ export default function Settings() {
                 type="checkbox"
                 className="sr-only peer"
                 checked={settings.paymentMethods.wallet}
-                onChange={(e) => handleSettingChange("paymentMethods", "wallet", e.target.checked)}
+                onChange={(e) => {
+                  setSettings(prev => ({
+                    ...prev,
+                    paymentMethods: {
+                      ...prev.paymentMethods,
+                      wallet: e.target.checked
+                    }
+                  }));
+                }}
               />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500 transition-colors"></div>
             </label>
           </div>
         </div>
       </div>
     </div>
   );
-
-  const renderNotificationSettings = () => (
-    <div className="space-y-6">
-      <div className="bg-white rounded-2xl shadow p-6">
-        <h3 className="text-lg font-bold text-own-2 mb-4">Notification Preferences</h3>
-        <div className="space-y-6">
-          <div>
-            <h4 className="font-medium text-gray-700 mb-3">Notification Channels</h4>
-            <div className="space-y-3 text-black">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <FontAwesomeIcon icon={faEnvelope} className="text-gray-500 mr-3" />
-                  <span>Email Notifications</span>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={settings.notifications.emailNotifications}
-                    onChange={(e) => handleSettingChange("notifications", "emailNotifications", e.target.checked)}
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-own-2"></div>
-                </label>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <FontAwesomeIcon icon={faMobileAlt} className="text-gray-500 mr-3" />
-                  <span>SMS Notifications</span>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={settings.notifications.smsNotifications}
-                    onChange={(e) => handleSettingChange("notifications", "smsNotifications", e.target.checked)}
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-own-2"></div>
-                </label>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <FontAwesomeIcon icon={faBell} className="text-gray-500 mr-3" />
-                  <span>Push Notifications</span>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={settings.notifications.pushNotifications}
-                    onChange={(e) => handleSettingChange("notifications", "pushNotifications", e.target.checked)}
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-own-2"></div>
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <h4 className="font-medium text-gray-700 mb-3">Notification Types</h4>
-            <div className="space-y-3 text-black">
-              <div className="flex items-center justify-between">
-                <span>Order Updates</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={settings.notifications.orderUpdates}
-                    onChange={(e) => handleSettingChange("notifications", "orderUpdates", e.target.checked)}
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-own-2"></div>
-                </label>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span>Payment Updates</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={settings.notifications.paymentUpdates}
-                    onChange={(e) => handleSettingChange("notifications", "paymentUpdates", e.target.checked)}
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-own-2"></div>
-                </label>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span>Marketing Emails</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={settings.notifications.marketingEmails}
-                    onChange={(e) => handleSettingChange("notifications", "marketingEmails", e.target.checked)}
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-own-2"></div>
-                </label>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-
-  const renderAdvancedSettings = () => (
-    <div className="space-y-6">
-      <div className="bg-white rounded-2xl shadow p-6">
-        <h3 className="text-lg font-bold text-own-2 mb-4">Advanced Settings</h3>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">API Key</label>
-            <div className="flex items-center">
-              <input
-                type="text"
-                className="flex-1 px-4 py-3 border text-black border-gray-300 rounded-l-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
-                value="sk_live_********************************"
-                readOnly
-              />
-              <button className="bg-own-2 text-white px-6 py-3 rounded-r-xl hover:bg-amber-600 transition-colors">
-                Regenerate
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Webhook URL</label>
-            <input
-              type="text"
-              className="w-full px-4 py-3 border text-black border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-own-2"
-              placeholder="https://your-domain.com/webhook"
-            />
-          </div>
-
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="debugMode"
-              className="h-4 w-4 text-own-2 rounded"
-            />
-            <label htmlFor="debugMode" className="ml-3 text-gray-700">
-              Enable Debug Mode
-            </label>
-          </div>
-
-          <div className="pt-4 border-t">
-            <button className="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors">
-              Clear All Data
-            </button>
-            <p className="text-sm text-gray-500 mt-2">
-              This will remove all orders, customers, and menu items. This action cannot be undone.
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
+  
   const renderContent = () => {
     switch (activeTab) {
       case "General":
         return renderGeneralSettings();
-      case "Profile":
-        return renderProfileSettings();
       case "Payments":
         return renderPaymentSettings();
-      case "Notifications":
-        return renderNotificationSettings();
-      case "Advanced":
-        return renderAdvancedSettings();
       default:
         return renderGeneralSettings();
     }
@@ -789,18 +632,23 @@ export default function Settings() {
         <div className={`pt-32 px-5 ${isSidebarOpen ? "md:w-[70%] lg:w-[75%]" : "md:w-full"} transition-all duration-500`}>
           <div className="max-w-7xl mx-auto">
             {/* Header */}
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
               <div>
                 <h2 className="text-2xl font-bold text-own-2">Settings</h2>
                 <p className="text-gray-600">Manage your restaurant and account settings</p>
               </div>
+              {!loading && (
+                <div className="text-sm text-gray-500">
+                  Last updated: {new Date().toLocaleDateString()}
+                </div>
+              )}
             </div>
 
             {/* Loading State */}
             {loading ? (
-              <div className="flex justify-center items-center py-20">
+              <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl shadow">
                 <FontAwesomeIcon icon={faSpinner} className="text-4xl text-own-2 animate-spin" />
-                <span className="ml-3 text-gray-600">Loading settings...</span>
+                <span className="ml-3 text-gray-600 mt-4">Loading settings...</span>
               </div>
             ) : (
               <>
@@ -811,10 +659,10 @@ export default function Settings() {
                       <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`px-4 py-3 rounded-xl flex items-center gap-2 transition-colors ${
+                        className={`px-4 py-3 rounded-xl flex items-center gap-2 transition-colors font-medium ${
                           activeTab === tab.id
-                            ? 'bg-own-2 text-white'
-                            : 'bg-white text-gray-700 hover:bg-gray-100'
+                            ? 'bg-own-2 text-white shadow-md'
+                            : 'bg-white text-gray-700 hover:bg-gray-100 shadow'
                         }`}
                       >
                         <FontAwesomeIcon icon={tab.icon} />
@@ -829,30 +677,31 @@ export default function Settings() {
                   {renderContent()}
                 </div>
 
-                {/* Save Button (for settings tabs except Profile) */}
-                {activeTab !== "Profile" && (
-                  <div className="sticky bottom-0 bg-white border-t p-4">
-                    <div className="flex justify-end">
-                      <button
-                        onClick={handleSaveSettings}
-                        disabled={saving}
-                        className="bg-own-2 text-white px-8 py-3 rounded-xl hover:bg-amber-600 transition-colors disabled:opacity-50 flex items-center gap-2"
-                      >
-                        {saving ? (
-                          <>
-                            <FontAwesomeIcon icon={faSpinner} className="animate-spin" />
-                            Saving...
-                          </>
-                        ) : (
-                          <>
-                            <FontAwesomeIcon icon={faSave} />
-                            Save Changes
-                          </>
-                        )}
-                      </button>
+                {/* Save Button */}
+                <div className="sticky bottom-0 bg-white border-t p-4 mt-8">
+                  <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <div className="text-sm text-gray-600">
+                      Changes will be saved to Firestore
                     </div>
+                    <button
+                      onClick={handleSaveSettings}
+                      disabled={saving}
+                      className="bg-own-2 text-white px-8 py-3 rounded-xl hover:bg-amber-600 transition-colors disabled:opacity-50 flex items-center gap-2 font-medium shadow-md"
+                    >
+                      {saving ? (
+                        <>
+                          <FontAwesomeIcon icon={faSpinner} className="animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <FontAwesomeIcon icon={faSave} />
+                          Save All Changes
+                        </>
+                      )}
+                    </button>
                   </div>
-                )}
+                </div>
               </>
             )}
           </div>

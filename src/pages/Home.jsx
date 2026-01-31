@@ -461,6 +461,7 @@ export default function Home() {
                     </section>
 
                     {/* Popular Dishes Gallery */}
+                    {popularDishes.length > 4 ? (
                     <section className="pb-10 px-6">
                         <MotionWrapper direction="up">
                             <h2 className="text-4xl font-bold text-center text-[oklch(29.23%_0_0)] font-display mb-3">Customer Favorites</h2>
@@ -518,6 +519,8 @@ export default function Home() {
                             </div>
                         )}
                     </section>
+                    )
+                        : (<></>)}
 
                     <section className="flex flex-col-reverse md:flex-row md:justify-between md:items-center md:gap-6 landscape:flex-row landscape:justify-between landscape:items-center landscape:gap-6 px-6 py-10 bg-own-1 text-white">
                         <motion.div initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 1 }} viewport={{ once: true, amount: 0.15 }} className="md:w-[50%] lg:w-[60%] landscape:w-[50%] landscape:lg:w-[60%]">

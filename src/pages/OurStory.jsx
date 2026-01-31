@@ -7,7 +7,7 @@ import { Link } from "react-router-dom";
 import Footer from "../components/Footer";
 import bg from "../assets/background.jpeg";
 import { db } from "../firebaseConfig";
-import { collection, getDocs, query } from "firebase/firestore";
+import { collection, getDocs, query, doc, getDoc } from "firebase/firestore";
 
 export default function OurStory() {
     const [mobileNavBarVisible, setMobileNavBarVisible] = useState(false);
@@ -23,31 +23,54 @@ export default function OurStory() {
         setError(null);
         
         try {
-            // Fetch chef data
-            const chefRef = collection(db, "chefInformation");
-            const chefQuery = query(chefRef);
-            const chefSnapshot = await getDocs(chefQuery);
+            // Fetch chef data from settings/chefInfo (where Settings page saves)
+            const chefRef = doc(db, "settings", "chefInfo");
+            const chefSnapshot = await getDoc(chefRef);
             
             let chefData = null;
-            if (!chefSnapshot.empty) {
-                const chefDoc = chefSnapshot.docs[0];
+            if (chefSnapshot.exists()) {
+                const chefDoc = chefSnapshot.data();
+                console.log("Fetched chef data:", chefDoc);
                 chefData = {
-                    id: chefDoc.id,
-                    name: chefDoc.data().name || "Ada Johnson",
-                    bio: chefDoc.data().chefBio || "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist.",
-                    image: chefDoc.data().chefImage || null
+                    id: "chefInfo",
+                    name: chefDoc.name || "Ada Johnson",
+                    bio: chefDoc.bio || "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist.",
+                    image: chefDoc.imageUrl || null
                 };
             } else {
-                // Default chef data if no chef in database
-                chefData = {
-                    name: "Ada Johnson",
-                    bio: "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist.",
-                    image: null
-                };
+                // Try the old location as fallback
+                try {
+                    const oldChefRef = doc(db, "chefInformation", "mainChef");
+                    const oldChefSnapshot = await getDoc(oldChefRef);
+                    
+                    if (oldChefSnapshot.exists()) {
+                        const oldChefDoc = oldChefSnapshot.data();
+                        chefData = {
+                            id: "mainChef",
+                            name: oldChefDoc.name || "Ada Johnson",
+                            bio: oldChefDoc.bio || "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist.",
+                            image: oldChefDoc.imageUrl || null
+                        };
+                    } else {
+                        // Default chef data if no chef in database
+                        chefData = {
+                            name: "Ada Johnson",
+                            bio: "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist.",
+                            image: null
+                        };
+                    }
+                } catch (oldError) {
+                    console.log("Old chef data not found, using defaults");
+                    chefData = {
+                        name: "Ada Johnson",
+                        bio: "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist.",
+                        image: null
+                    };
+                }
             }
             setChef(chefData);
             
-            // Fetch gallery images
+            // Fetch gallery images - KEEPING THIS EXACTLY AS IT WAS
             const galleryRef = collection(db, "gallery");
             const galleryQuery = query(galleryRef);
             const gallerySnapshot = await getDocs(galleryQuery);
@@ -196,7 +219,7 @@ export default function OurStory() {
         return (
             <>
                 <NavBar activeLink="Our Story" onToggleMobileNavBar={() => setMobileNavBarVisible(!mobileNavBarVisible)} />
-                <MobileNavBar isVisible={mobileNavBarVisible} activeLink="Our Story" onClose={() => setMobileNavBarVisible(false)} className="md:col-span-1 pt-7"/>
+                <MobileNavBar isVisible={mobileNavBarVisible} activeLink="Our Story" onClose={() => setMobileNavBarVisible(false)} className="md:colspan-1 pt-7"/>
                 <div className="flex justify-center items-center h-screen">
                     <div className="text-center p-6 bg-red-50 rounded-lg">
                         <p className="text-red-600 mb-4">{error}</p>
