@@ -59,7 +59,7 @@ export default function CompleteProfile() {
             if (existing) {
                 navigate("/user/dashboard");
             } else {
-                navigate("/user/welcome");
+                navigate("/user/dashboard");
             }
             
         } catch (err) {
@@ -110,7 +110,7 @@ export default function CompleteProfile() {
                                     value={phone}
                                     onChange={(e) => setPhone(e.target.value)}
                                     disabled={loading}
-                                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg placeholder-gray-400 focus:ring-2 focus:ring-own-2 focus:border-own-2 sm:text-sm"
+                                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg placeholder-gray-400 focus:ring-2 focus:ring-own-2 focus:border-own-2 sm:text-sm text-black"
                                     placeholder="+1 (555) 123-4567"
                                 />
                             </div>
