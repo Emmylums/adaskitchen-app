@@ -126,11 +126,11 @@ export default function ContactUs() {
             </p>
 
             <p className="mb-4">
-              Phone: <a href="tel:+447737176235" className="underline">+44 7737 176235</a>
+              Phone: <a href="tel:+447466385015" className="underline">+44 74663 85015</a>
             </p>
 
             <p className="mb-8">
-              Email: <a href="mailto:info@adaskitchen.com" className="underline">info@adaskitchen.com</a>
+              Email: <a href="mailto:info@adaskitchen.uk" className="underline">info@adaskitchen.uk</a>
             </p>
 
             {/* what3words Section */}

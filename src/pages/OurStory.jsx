@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import NavBar from "../components/NavBar";
 import MobileNavBar from "../components/MobileNavBar";
-import cooking from "../assets/cooking.png";
+import cooking from "../assets/cooking5.jpeg";
 import { motion } from 'framer-motion';
 import { Link } from "react-router-dom";
 import Footer from "../components/Footer";
