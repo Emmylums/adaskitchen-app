@@ -67,13 +67,14 @@ export default function MenuManagement() {
     available: true
   });
   
-    const formatCurrency = (amount) => {
+  const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
       currency: 'GBP',
       minimumFractionDigits: 2
     }).format(amount / 1);
   };
+  
   // Modal states
   const [showMenuModal, setShowMenuModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -125,7 +126,7 @@ export default function MenuManagement() {
     }
   };
 
-  // Handle menu submission
+  // Handle menu submission - FIXED VERSION
   const handleMenuSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -133,9 +134,27 @@ export default function MenuManagement() {
     try {
       let imageUrl = '';
       
-      // Upload image if provided
+      // If editing and has an existing image URL in the form preview, use it
+      if (editingItem && menuForm.imagePreview && !menuForm.image) {
+        // If editing and no new image uploaded, keep the existing image URL
+        // Check if imagePreview is a URL (starts with http) or a blob URL (starts with blob:)
+        if (menuForm.imagePreview.startsWith('http') || menuForm.imagePreview.startsWith('blob:')) {
+          // This is likely the existing image URL or a new blob preview
+          imageUrl = editingItem.imageUrl || menuForm.imagePreview;
+        } else {
+          // Fallback to editingItem's imageUrl
+          imageUrl = editingItem.imageUrl || '';
+        }
+      }
+      
+      // Upload new image if provided
       if (menuForm.image) {
         imageUrl = await uploadImage(menuForm.image);
+      }
+      
+      // For new items without image, use placeholder
+      if (!editingItem && !menuForm.image && !imageUrl) {
+        imageUrl = '/api/placeholder/300/200';
       }
 
       const menuData = {
@@ -150,7 +169,7 @@ export default function MenuManagement() {
         isFeatured: menuForm.isFeatured,
         calories: parseInt(menuForm.calories) || 0,
         available: menuForm.available,
-        imageUrl: imageUrl || '/api/placeholder/300/200',
+        imageUrl: imageUrl,
         createdAt: editingItem ? menuForm.createdAt : serverTimestamp(),
         updatedAt: serverTimestamp()
       };
@@ -178,7 +197,7 @@ export default function MenuManagement() {
     }
   };
 
-  // Handle edit menu item
+  // Handle edit menu item - FIXED VERSION
   const handleEditMenu = (item) => {
     setEditingItem(item);
     setMenuForm({
@@ -193,7 +212,7 @@ export default function MenuManagement() {
       isFeatured: item.isFeatured || false,
       calories: item.calories || 0,
       image: null,
-      imagePreview: item.imageUrl || "",
+      imagePreview: item.imageUrl || "", // Store the existing image URL
       available: item.available !== false,
       createdAt: item.createdAt
     });
@@ -280,6 +299,15 @@ export default function MenuManagement() {
     const matchesCategory = selectedCategory === "all" || item.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
+
+  // Function to clear image from form
+  const clearImage = () => {
+    setMenuForm({
+      ...menuForm,
+      image: null,
+      imagePreview: editingItem?.imageUrl || "" // Keep original URL if editing
+    });
+  };
 
   return (
     <>
@@ -373,11 +401,15 @@ export default function MenuManagement() {
                       <div key={item.id} className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300">
                         {/* Image Section */}
                         <div className="h-48 relative overflow-hidden bg-gradient-to-br from-own-2/20 to-amber-400/20">
-                          {item.imageUrl ? (
+                          {item.imageUrl && item.imageUrl !== '/api/placeholder/300/200' ? (
                             <img 
                               src={item.imageUrl} 
                               alt={item.name}
                               className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = '/api/placeholder/300/200';
+                              }}
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
@@ -525,14 +557,21 @@ export default function MenuManagement() {
                               src={menuForm.imagePreview}
                               alt="Preview"
                               className="mx-auto h-48 w-48 object-cover rounded-lg"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = '/api/placeholder/300/200';
+                              }}
                             />
                             <button
                               type="button"
-                              onClick={() => setMenuForm({...menuForm, image: null, imagePreview: ""})}
-                              className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full"
+                              onClick={clearImage}
+                              className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
                             >
                               <FontAwesomeIcon icon={faTimes} className="h-4 w-4" />
                             </button>
+                            <div className="text-xs text-gray-500 mt-2">
+                              {editingItem && !menuForm.image ? "Current image" : "Image preview"}
+                            </div>
                           </div>
                         ) : (
                           <>
@@ -564,6 +603,11 @@ export default function MenuManagement() {
                             <p className="text-xs text-gray-500">
                               PNG, JPG, GIF up to 10MB
                             </p>
+                            {editingItem && editingItem.imageUrl && (
+                              <p className="text-xs text-green-600 mt-2">
+                                Current image will be kept if no new image is uploaded
+                              </p>
+                            )}
                           </>
                         )}
                       </div>
