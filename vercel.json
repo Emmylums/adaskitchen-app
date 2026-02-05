@@ -3,6 +3,7 @@
     {
       "handle": "filesystem"
     },
+
     {
       "src": "^/robots\\.txt$",
       "dest": "/robots.txt"
@@ -11,6 +12,7 @@
       "src": "^/sitemap\\.xml$",
       "dest": "/sitemap.xml"
     },
+
     {
       "src": "^/assets/(.*)",
       "dest": "/assets/$1",
@@ -18,14 +20,17 @@
         "cache-control": "public, max-age=31536000, immutable"
       }
     },
+
     {
       "src": "^/(.*\\.(png|jpg|jpeg|gif|svg|ico|webp))$",
+      "dest": "/$1",
       "headers": {
         "cache-control": "public, max-age=31536000, immutable"
       }
     },
+
     {
-      "src": ".*",
+      "src": "/(.*)",
       "dest": "/index.html"
     }
   ]
