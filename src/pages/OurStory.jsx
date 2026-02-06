@@ -19,110 +19,135 @@ export default function OurStory() {
 
     // Fetch chef data and gallery images from Firebase
     const fetchData = async () => {
-        setLoading(true);
-        setError(null);
+    setLoading(true);
+    setError(null);
+    
+    try {
+        // Fetch chef data - improved with better error handling
+        let chefData = null;
         
-        try {
-            // Fetch chef data from settings/chefInfo (where Settings page saves)
-            const chefRef = doc(db, "settings", "chefInfo");
-            const chefSnapshot = await getDoc(chefRef);
-            
-            let chefData = null;
-            if (chefSnapshot.exists()) {
-                const chefDoc = chefSnapshot.data();
-                console.log("Fetched chef data:", chefDoc);
-                chefData = {
-                    id: "chefInfo",
-                    name: chefDoc.name || "Ada Johnson",
-                    bio: chefDoc.bio || "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist.",
-                    image: chefDoc.imageUrl || null
-                };
-            } else {
-                // Try the old location as fallback
-                try {
-                    const oldChefRef = doc(db, "chefInformation", "mainChef");
-                    const oldChefSnapshot = await getDoc(oldChefRef);
-                    
-                    if (oldChefSnapshot.exists()) {
-                        const oldChefDoc = oldChefSnapshot.data();
-                        chefData = {
-                            id: "mainChef",
-                            name: oldChefDoc.name || "Ada Johnson",
-                            bio: oldChefDoc.bio || "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist.",
-                            image: oldChefDoc.imageUrl || null
-                        };
-                    } else {
-                        // Default chef data if no chef in database
-                        chefData = {
-                            name: "Ada Johnson",
-                            bio: "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist.",
-                            image: null
-                        };
-                    }
-                } catch (oldError) {
-                    console.log("Old chef data not found, using defaults");
+        // Try multiple possible document locations
+        const possibleChefPaths = [
+            { ref: doc(db, "settings", "chefInfo"), name: "settings/chefInfo" },
+            { ref: doc(db, "chefInformation", "mainChef"), name: "chefInformation/mainChef" },
+            { ref: doc(db, "chef", "info"), name: "chef/info" }
+        ];
+        
+        for (const path of possibleChefPaths) {
+            try {
+                const snapshot = await getDoc(path.ref);
+                if (snapshot.exists()) {
+                    const data = snapshot.data();
+                    console.log(`Found chef data at: ${path.name}`, data);
                     chefData = {
-                        name: "Ada Johnson",
-                        bio: "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist.",
-                        image: null
+                        id: snapshot.id,
+                        name: data.name || data.chefName || "Ada Johnson",
+                        bio: data.bio || data.chefBio || "With over 15 years of culinary experience...",
+                        image: data.imageUrl || data.image || data.photoUrl || null
                     };
+                    break; // Exit loop once found
                 }
+            } catch (pathError) {
+                console.log(`No chef data at ${path.name}:`, pathError.message);
+                // Continue to next path
             }
-            setChef(chefData);
-            
-            // Fetch gallery images - KEEPING THIS EXACTLY AS IT WAS
+        }
+        
+        // If no chef data found, use defaults
+        if (!chefData) {
+            console.log("Using default chef data");
+            chefData = {
+                name: "Ada Johnson",
+                bio: "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist.",
+                image: null
+            };
+        }
+        
+        setChef(chefData);
+        
+        // Fetch gallery images with better error handling
+        try {
             const galleryRef = collection(db, "gallery");
             const galleryQuery = query(galleryRef);
             const gallerySnapshot = await getDocs(galleryQuery);
             
-            const galleryData = [];
-            gallerySnapshot.forEach((doc) => {
-                const data = doc.data();
-                galleryData.push({
-                    id: doc.id,
-                    alt: data.alt || "Gallery image",
-                    image: data.image || data.imageUrl || data.url || null,
-                    title: data.title || data.name || ""
-                });
-            });
+            let galleryData = [];
             
-            // If no gallery images in database, use default placeholders
-            if (galleryData.length === 0) {
-                setGalleryImages([
-                    { id: 1, alt: "Traditional Nigerian Jollof Rice" },
-                    { id: 2, alt: "Chef preparing Suya" },
-                    { id: 3, alt: "Colorful African spices" },
-                    { id: 4, alt: "Customers enjoying meal" },
-                    { id: 5, alt: "Catering event setup" },
-                    { id: 6, alt: "Fresh ingredients preparation" }
-                ]);
-            } else {
-                setGalleryImages(galleryData);
+            if (!gallerySnapshot.empty) {
+                gallerySnapshot.forEach((doc) => {
+                    try {
+                        const data = doc.data();
+                        // Validate the data
+                        if (data && (data.image || data.imageUrl || data.url)) {
+                            galleryData.push({
+                                id: doc.id,
+                                alt: data.alt || data.title || data.name || "Gallery image",
+                                image: data.image || data.imageUrl || data.url,
+                                title: data.title || data.name || ""
+                            });
+                        }
+                    } catch (docError) {
+                        console.error(`Error processing gallery doc ${doc.id}:`, docError);
+                    }
+                });
             }
             
-        } catch (err) {
-            console.error("Error fetching data:", err);
-            setError("Failed to load content. Please try again later.");
+            // Sort gallery images if needed (by timestamp or order field)
+            if (galleryData.length > 0) {
+                galleryData.sort((a, b) => {
+                    // Add sorting logic if you have a timestamp or order field
+                    return 0;
+                });
+            } else {
+                // Use meaningful default images
+                galleryData = [
+                    { id: 1, alt: "Traditional Nigerian Jollof Rice", title: "Signature Jollof Rice" },
+                    { id: 2, alt: "Chef preparing Suya", title: "Suya Preparation" },
+                    { id: 3, alt: "Colorful African spices", title: "Our Spices" },
+                    { id: 4, alt: "Customers enjoying meal", title: "Happy Customers" },
+                    { id: 5, alt: "Catering event setup", title: "Event Catering" },
+                    { id: 6, alt: "Fresh ingredients preparation", title: "Fresh Ingredients" }
+                ];
+            }
             
-            // Set default data if Firebase fails
-            setChef({
-                name: "Ada Johnson",
-                bio: "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist.",
-                image: null
-            });
+            setGalleryImages(galleryData);
             
+        } catch (galleryError) {
+            console.error("Error fetching gallery:", galleryError);
+            // Set default gallery images without throwing
             setGalleryImages([
-                { id: 1, alt: "Traditional Nigerian Jollof Rice" },
-                { id: 2, alt: "Chef preparing Suya" },
-                { id: 3, alt: "Colorful African spices" },
-                { id: 4, alt: "Customers enjoying meal" },
-                { id: 5, alt: "Catering event setup" },
-                { id: 6, alt: "Fresh ingredients preparation" }
+                { id: 1, alt: "Traditional Nigerian Jollof Rice", title: "Signature Jollof Rice" },
+                { id: 2, alt: "Chef preparing Suya", title: "Suya Preparation" },
+                { id: 3, alt: "Colorful African spices", title: "Our Spices" },
+                { id: 4, alt: "Customers enjoying meal", title: "Happy Customers" },
+                { id: 5, alt: "Catering event setup", title: "Event Catering" },
+                { id: 6, alt: "Fresh ingredients preparation", title: "Fresh Ingredients" }
             ]);
-        } finally {
-            setLoading(false);
         }
-    };
+        
+    } catch (err) {
+        console.error("Critical error in fetchData:", err);
+        setError("We're having trouble loading our story. Please refresh the page or try again later.");
+        
+        // Set defaults for both chef and gallery
+        setChef({
+            name: "Ada Johnson",
+            bio: "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist.",
+            image: null
+        });
+        
+        setGalleryImages([
+            { id: 1, alt: "Traditional Nigerian Jollof Rice", title: "Gallery image" },
+            { id: 2, alt: "Chef preparing Suya", title: "Gallery image" },
+            { id: 3, alt: "Colorful African spices", title: "Gallery image" },
+            { id: 4, alt: "Customers enjoying meal", title: "Gallery image" },
+            { id: 5, alt: "Catering event setup", title: "Gallery image" },
+            { id: 6, alt: "Fresh ingredients preparation", title: "Gallery image" }
+        ]);
+    } finally {
+        setLoading(false);
+    }
+};
 
     useEffect(() => {
         fetchData();
