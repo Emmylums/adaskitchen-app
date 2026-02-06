@@ -18,44 +18,58 @@ export default function OurStory() {
     const [error, setError] = useState(null);
 
     // Fetch chef data and gallery images from Firebase
-    const fetchData = async () => {
+    // Updated fetchData function - replace the existing one
+const fetchData = async () => {
     setLoading(true);
     setError(null);
     
     try {
-        // Fetch chef data - improved with better error handling
+        // Fetch chef data - check all possible paths including the Settings page location
         let chefData = null;
         
-        // Try multiple possible document locations
+        // Define all possible paths where chef data might be stored
         const possibleChefPaths = [
             { ref: doc(db, "settings", "chefInfo"), name: "settings/chefInfo" },
             { ref: doc(db, "chefInformation", "mainChef"), name: "chefInformation/mainChef" },
-            { ref: doc(db, "chef", "info"), name: "chef/info" }
+            { ref: doc(db, "chef", "info"), name: "chef/info" },
+            // Add more paths if needed
+            { ref: doc(db, "chef", "main"), name: "chef/main" },
+            { ref: doc(db, "about", "chef"), name: "about/chef" }
         ];
         
+        // Try each path sequentially
         for (const path of possibleChefPaths) {
             try {
                 const snapshot = await getDoc(path.ref);
                 if (snapshot.exists()) {
                     const data = snapshot.data();
                     console.log(`Found chef data at: ${path.name}`, data);
+                    
+                    // Parse the data with multiple possible field names
                     chefData = {
                         id: snapshot.id,
-                        name: data.name || data.chefName || "Ada Johnson",
-                        bio: data.bio || data.chefBio || "With over 15 years of culinary experience...",
-                        image: data.imageUrl || data.image || data.photoUrl || null
+                        // Try different field names that might be used
+                        name: data.name || data.chefName || data.fullName || "Ada Johnson",
+                        bio: data.bio || data.chefBio || data.description || data.about || 
+                             "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist.",
+                        // Try different image field names
+                        image: data.imageUrl || data.image || data.photoUrl || data.photo || 
+                               data.profileImage || data.profileUrl || null
                     };
+                    console.log("Parsed chef data:", chefData);
                     break; // Exit loop once found
+                } else {
+                    console.log(`No document found at ${path.name}`);
                 }
             } catch (pathError) {
-                console.log(`No chef data at ${path.name}:`, pathError.message);
+                console.warn(`Error accessing ${path.name}:`, pathError.message);
                 // Continue to next path
             }
         }
         
-        // If no chef data found, use defaults
+        // If no chef data found in Firestore, use defaults
         if (!chefData) {
-            console.log("Using default chef data");
+            console.log("No chef data found in Firestore, using defaults");
             chefData = {
                 name: "Ada Johnson",
                 bio: "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist.",
@@ -65,7 +79,7 @@ export default function OurStory() {
         
         setChef(chefData);
         
-        // Fetch gallery images with better error handling
+        // Fetch gallery images
         try {
             const galleryRef = collection(db, "gallery");
             const galleryQuery = query(galleryRef);
@@ -78,12 +92,12 @@ export default function OurStory() {
                     try {
                         const data = doc.data();
                         // Validate the data
-                        if (data && (data.image || data.imageUrl || data.url)) {
+                        if (data && (data.image || data.imageUrl || data.url || data.photo)) {
                             galleryData.push({
                                 id: doc.id,
-                                alt: data.alt || data.title || data.name || "Gallery image",
-                                image: data.image || data.imageUrl || data.url,
-                                title: data.title || data.name || ""
+                                alt: data.alt || data.title || data.name || data.description || "Gallery image",
+                                image: data.image || data.imageUrl || data.url || data.photo,
+                                title: data.title || data.name || data.caption || ""
                             });
                         }
                     } catch (docError) {
@@ -92,14 +106,9 @@ export default function OurStory() {
                 });
             }
             
-            // Sort gallery images if needed (by timestamp or order field)
-            if (galleryData.length > 0) {
-                galleryData.sort((a, b) => {
-                    // Add sorting logic if you have a timestamp or order field
-                    return 0;
-                });
-            } else {
-                // Use meaningful default images
+            // Use default gallery images if none found
+            if (galleryData.length === 0) {
+                console.log("No gallery images found, using defaults");
                 galleryData = [
                     { id: 1, alt: "Traditional Nigerian Jollof Rice", title: "Signature Jollof Rice" },
                     { id: 2, alt: "Chef preparing Suya", title: "Suya Preparation" },
@@ -114,7 +123,7 @@ export default function OurStory() {
             
         } catch (galleryError) {
             console.error("Error fetching gallery:", galleryError);
-            // Set default gallery images without throwing
+            // Set default gallery images
             setGalleryImages([
                 { id: 1, alt: "Traditional Nigerian Jollof Rice", title: "Signature Jollof Rice" },
                 { id: 2, alt: "Chef preparing Suya", title: "Suya Preparation" },
@@ -129,7 +138,7 @@ export default function OurStory() {
         console.error("Critical error in fetchData:", err);
         setError("We're having trouble loading our story. Please refresh the page or try again later.");
         
-        // Set defaults for both chef and gallery
+        // Set defaults
         setChef({
             name: "Ada Johnson",
             bio: "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist.",
@@ -148,7 +157,6 @@ export default function OurStory() {
         setLoading(false);
     }
 };
-
     useEffect(() => {
         fetchData();
     }, []);
