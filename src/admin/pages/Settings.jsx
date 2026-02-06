@@ -221,7 +221,7 @@ export default function Settings() {
       reader.onloadend = () => {
         setSettings(prev => ({
           ...prev,
-          chefImageUrl: reader.result, // Temporary preview
+          chefImageUrl: reader.result, // Temporary base64 preview
           chefImageFile: file
         }));
       };
@@ -272,9 +272,31 @@ export default function Settings() {
         } finally {
           setUploadingImage(false);
         }
+      } else {
+        // No new image uploaded
+        // If chefImageUrl is a base64 string (from preview), we need to check if we have an original URL
+        if (settings.chefImageUrl && settings.chefImageUrl.startsWith('data:')) {
+          // This is a base64 preview
+          // Check if we previously had a Firebase Storage URL by looking at the original data
+          // or just keep the existing URL in Firestore
+          const chefRef = doc(db, "settings", "chefInfo");
+          const chefSnapshot = await getDoc(chefRef);
+          
+          if (chefSnapshot.exists()) {
+            const existingData = chefSnapshot.data();
+            if (existingData.imageUrl && existingData.imageUrl.startsWith('https://')) {
+              // Keep the original Firebase Storage URL
+              imageUrl = existingData.imageUrl;
+            } else {
+              // No original URL, set to empty
+              imageUrl = "";
+            }
+          }
+        }
+        // If chefImageUrl is already a Firebase URL or empty, keep it as is
       }
       
-      // If editing and removed image, set to empty string
+      // If user removed image and there's no file
       if (!imageUrl && settings.chefImageUrl && !settings.chefImageFile) {
         imageUrl = "";
       }
@@ -325,7 +347,15 @@ export default function Settings() {
       if (settings.chefImageFile) {
         setSettings(prev => ({
           ...prev,
-          chefImageFile: null
+          chefImageFile: null,
+          // Update the preview to show the actual Firebase URL, not base64
+          chefImageUrl: imageUrl
+        }));
+      } else {
+        // Ensure we show the actual URL, not base64 preview
+        setSettings(prev => ({
+          ...prev,
+          chefImageUrl: imageUrl
         }));
       }
       
