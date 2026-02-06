@@ -5,30 +5,16 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faSave, 
   faUser, 
-  faBell, 
-  faLock, 
-  faPalette, 
-  faShieldAlt, 
-  faDatabase, 
-  faGlobe,
-  faCreditCard,
-  faStore,
-  faTruck,
-  faPrint,
-  faEnvelope,
-  faMobileAlt,
-  faCheckCircle,
-  faTimes,
-  faSpinner,
-  faEye,
-  faEyeSlash,
-  faUpload,
-  faTrash,
   faClock,
   faUtensils,
-  faMapMarkerAlt,
-  faLanguage,
-  faMoneyBillWave
+  faMoneyBillWave,
+  faCreditCard,
+  faGlobe,
+  faMobileAlt,
+  faSpinner,
+  faUpload,
+  faTrash,
+  faTimes
 } from '@fortawesome/free-solid-svg-icons';
 import { 
   collection, 
@@ -40,7 +26,8 @@ import {
   getDoc,
   writeBatch
 } from "firebase/firestore";
-import { db } from "../../firebaseConfig";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { db, storage } from "../../firebaseConfig";
 
 export default function Settings() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -52,6 +39,7 @@ export default function Settings() {
   const [activeTab, setActiveTab] = useState("General");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   
   // Mock user data
   const userData = {
@@ -181,24 +169,43 @@ export default function Settings() {
     }
   };
 
-  const handleSettingChange = (section, field, value) => {
-    if (section.includes('.')) {
-      const [mainSection, subSection, subField] = section.split('.');
-      setSettings(prev => ({
-        ...prev,
-        [mainSection]: {
-          ...prev[mainSection],
-          [subSection]: {
-            ...prev[mainSection][subSection],
-            [subField || subSection]: value
-          }
-        }
-      }));
-    } else {
-      setSettings(prev => ({
-        ...prev,
-        [section]: field // Note: field is the value when called directly
-      }));
+  // Upload image to Firebase Storage (similar to Menu Management)
+  const uploadImageToStorage = async (file) => {
+    try {
+      // Create a unique filename
+      const timestamp = Date.now();
+      const fileName = `chef_${timestamp}_${file.name.replace(/\s+/g, '_')}`;
+      const storageRef = ref(storage, `chef-profile/${fileName}`);
+      
+      // Upload the file
+      const snapshot = await uploadBytes(storageRef, file);
+      
+      // Get the download URL
+      const downloadURL = await getDownloadURL(snapshot.ref);
+      
+      return downloadURL;
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      throw error;
+    }
+  };
+
+  // Delete image from Firebase Storage
+  const deleteImageFromStorage = async (imageUrl) => {
+    try {
+      // Extract the path from the URL
+      const url = new URL(imageUrl);
+      const path = decodeURIComponent(url.pathname.split('/o/')[1].split('?')[0]);
+      
+      // Create a reference to the file
+      const imageRef = ref(storage, path);
+      
+      // Delete the file
+      await deleteObject(imageRef);
+      console.log("Image deleted from storage");
+    } catch (error) {
+      console.error("Error deleting image:", error);
+      // Don't throw error if image doesn't exist
     }
   };
 
@@ -214,7 +221,7 @@ export default function Settings() {
       reader.onloadend = () => {
         setSettings(prev => ({
           ...prev,
-          chefImageUrl: reader.result,
+          chefImageUrl: reader.result, // Temporary preview
           chefImageFile: file
         }));
       };
@@ -222,23 +229,61 @@ export default function Settings() {
     }
   };
 
-  const removeChefImage = () => {
-    setSettings(prev => ({
-      ...prev,
-      chefImageUrl: "",
-      chefImageFile: null
-    }));
+  const removeChefImage = async () => {
+    try {
+      // If there's an existing image URL (not base64 preview), delete from storage
+      if (settings.chefImageUrl && settings.chefImageUrl.startsWith('https://')) {
+        // Only delete from storage if it's a Firebase Storage URL
+        if (settings.chefImageUrl.includes('firebasestorage.googleapis.com')) {
+          await deleteImageFromStorage(settings.chefImageUrl);
+        }
+      }
+      
+      setSettings(prev => ({
+        ...prev,
+        chefImageUrl: "",
+        chefImageFile: null
+      }));
+      
+    } catch (error) {
+      console.error("Error removing image:", error);
+      alert("Error removing image. Please try again.");
+    }
   };
 
   const handleSaveSettings = async () => {
     try {
       setSaving(true);
       
+      let imageUrl = settings.chefImageUrl;
+      
+      // Upload new image if provided
+      if (settings.chefImageFile) {
+        setUploadingImage(true);
+        try {
+          imageUrl = await uploadImageToStorage(settings.chefImageFile);
+          console.log("Image uploaded successfully:", imageUrl);
+        } catch (uploadError) {
+          console.error("Failed to upload image:", uploadError);
+          alert("Failed to upload image. Please try again.");
+          setUploadingImage(false);
+          setSaving(false);
+          return;
+        } finally {
+          setUploadingImage(false);
+        }
+      }
+      
+      // If editing and removed image, set to empty string
+      if (!imageUrl && settings.chefImageUrl && !settings.chefImageFile) {
+        imageUrl = "";
+      }
+
       // Prepare all data to save
       const chefData = {
         name: settings.chefName || "",
         bio: settings.chefBio || "",
-        imageUrl: settings.chefImageUrl || "",
+        imageUrl: imageUrl, // Store the Firebase Storage URL
         updatedAt: serverTimestamp()
       };
 
@@ -275,6 +320,15 @@ export default function Settings() {
       await batch.commit();
 
       console.log("All settings saved successfully!");
+      
+      // Clear the temporary file after successful save
+      if (settings.chefImageFile) {
+        setSettings(prev => ({
+          ...prev,
+          chefImageFile: null
+        }));
+      }
+      
       alert("Settings saved successfully!");
       
     } catch (error) {
@@ -292,7 +346,7 @@ export default function Settings() {
   };
 
   const tabs = [
-    { id: "General", icon: faStore, label: "General" },
+    { id: "General", icon: faUtensils, label: "General" },
     { id: "Payments", icon: faCreditCard, label: "Payments" },
   ];
 
@@ -314,6 +368,11 @@ export default function Settings() {
                   src={settings.chefImageUrl} 
                   alt="Chef" 
                   className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = '/api/placeholder/300/300';
+                    e.target.className = 'w-full h-full object-cover';
+                  }}
                 />
               ) : (
                 <div className="w-full h-full bg-gray-200 flex items-center justify-center">
@@ -322,26 +381,41 @@ export default function Settings() {
               )}
             </div>
             <div className="absolute bottom-0 right-0 flex space-x-2">
-              <label className="cursor-pointer bg-own-2 text-white p-2 rounded-full hover:bg-amber-600 transition-colors">
-                <FontAwesomeIcon icon={faUpload} />
-                <input
-                  type="file"
-                  className="hidden"
-                  accept="image/*"
-                  onChange={handleChefImageUpload}
-                />
+              <label className={`cursor-pointer ${uploadingImage ? 'opacity-50 cursor-not-allowed' : ''} bg-own-2 text-white p-2 rounded-full hover:bg-amber-600 transition-colors`}>
+                {uploadingImage ? (
+                  <FontAwesomeIcon icon={faSpinner} className="animate-spin" />
+                ) : (
+                  <>
+                    <FontAwesomeIcon icon={faUpload} />
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept="image/*"
+                      onChange={handleChefImageUpload}
+                      disabled={uploadingImage || saving}
+                    />
+                  </>
+                )}
               </label>
-              {settings.chefImageUrl && (
+              {settings.chefImageUrl && !uploadingImage && (
                 <button
                   onClick={removeChefImage}
-                  className="bg-red-600 text-white p-2 rounded-full hover:bg-red-700 transition-colors"
+                  disabled={saving}
+                  className="bg-red-600 text-white p-2 rounded-full hover:bg-red-700 transition-colors disabled:opacity-50"
                 >
                   <FontAwesomeIcon icon={faTrash} />
                 </button>
               )}
             </div>
           </div>
-          <p className="text-sm text-gray-500 mt-2">Upload chef profile picture (Max 5MB)</p>
+          <p className="text-sm text-gray-500 mt-2">
+            {uploadingImage ? 'Uploading image...' : 'Upload chef profile picture (Max 5MB)'}
+          </p>
+          {settings.chefImageFile && !uploadingImage && (
+            <p className="text-xs text-green-600 mt-1">
+              New image selected. Click "Save All Changes" to upload.
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -353,6 +427,7 @@ export default function Settings() {
               value={settings.chefName}
               onChange={(e) => setSettings(prev => ({ ...prev, chefName: e.target.value }))}
               placeholder="Enter chef's full name"
+              disabled={saving}
             />
           </div>
           <div className="md:col-span-2">
@@ -363,12 +438,13 @@ export default function Settings() {
               value={settings.chefBio}
               onChange={(e) => setSettings(prev => ({ ...prev, chefBio: e.target.value }))}
               placeholder="Tell us about the chef's experience, specialties, and story..."
+              disabled={saving}
             />
           </div>
         </div>
       </div>
 
-      {/* Responsive Business Hours Section */}
+      {/* Business Hours Section */}
       <div className="bg-white rounded-2xl shadow p-6">
         <h3 className="text-lg font-bold text-own-2 mb-4 flex items-center">
           <FontAwesomeIcon icon={faClock} className="mr-2" />
@@ -387,6 +463,7 @@ export default function Settings() {
                     updatedHours[day].closed = !e.target.checked;
                     setSettings(prev => ({ ...prev, businessHours: updatedHours }));
                   }}
+                  disabled={saving}
                 />
                 <span className="capitalize font-medium text-gray-800 min-w-[100px]">
                   {day.charAt(0).toUpperCase() + day.slice(1)}
@@ -406,6 +483,7 @@ export default function Settings() {
                         updatedHours[day].open = e.target.value;
                         setSettings(prev => ({ ...prev, businessHours: updatedHours }));
                       }}
+                      disabled={saving}
                     />
                   </div>
                   <div className="flex items-center gap-2">
@@ -419,6 +497,7 @@ export default function Settings() {
                         updatedHours[day].close = e.target.value;
                         setSettings(prev => ({ ...prev, businessHours: updatedHours }));
                       }}
+                      disabled={saving}
                     />
                   </div>
                 </div>
@@ -443,7 +522,8 @@ export default function Settings() {
                 });
                 setSettings(prev => ({ ...prev, businessHours: updatedHours }));
               }}
-              className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors text-sm font-medium"
+              disabled={saving}
+              className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors text-sm font-medium disabled:opacity-50"
             >
               Open All Days
             </button>
@@ -455,7 +535,8 @@ export default function Settings() {
                 });
                 setSettings(prev => ({ ...prev, businessHours: updatedHours }));
               }}
-              className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium"
+              disabled={saving}
+              className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium disabled:opacity-50"
             >
               Close All Days
             </button>
@@ -472,7 +553,8 @@ export default function Settings() {
                 };
                 setSettings(prev => ({ ...prev, businessHours: standardHours }));
               }}
-              className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium"
+              disabled={saving}
+              className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium disabled:opacity-50"
             >
               Set Standard Hours
             </button>
@@ -511,6 +593,7 @@ export default function Settings() {
                     }
                   }));
                 }}
+                disabled={saving}
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-own-2 transition-colors"></div>
             </label>
@@ -540,6 +623,7 @@ export default function Settings() {
                     }
                   }));
                 }}
+                disabled={saving}
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500 transition-colors"></div>
             </label>
@@ -569,6 +653,7 @@ export default function Settings() {
                     }
                   }));
                 }}
+                disabled={saving}
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500 transition-colors"></div>
             </label>
@@ -598,6 +683,7 @@ export default function Settings() {
                     }
                   }));
                 }}
+                disabled={saving}
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500 transition-colors"></div>
             </label>
@@ -659,7 +745,8 @@ export default function Settings() {
                       <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`px-4 py-3 rounded-xl flex items-center gap-2 transition-colors font-medium ${
+                        disabled={saving}
+                        className={`px-4 py-3 rounded-xl flex items-center gap-2 transition-colors font-medium ${saving ? 'opacity-50 cursor-not-allowed' : ''} ${
                           activeTab === tab.id
                             ? 'bg-own-2 text-white shadow-md'
                             : 'bg-white text-gray-700 hover:bg-gray-100 shadow'
@@ -681,17 +768,17 @@ export default function Settings() {
                 <div className="sticky bottom-0 bg-white border-t p-4 mt-8">
                   <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                     <div className="text-sm text-gray-600">
-                      Changes will be saved to Firestore
+                      {uploadingImage ? 'Uploading image...' : 'Changes will be saved to Firestore'}
                     </div>
                     <button
                       onClick={handleSaveSettings}
-                      disabled={saving}
+                      disabled={saving || uploadingImage}
                       className="bg-own-2 text-white px-8 py-3 rounded-xl hover:bg-amber-600 transition-colors disabled:opacity-50 flex items-center gap-2 font-medium shadow-md"
                     >
-                      {saving ? (
+                      {saving || uploadingImage ? (
                         <>
                           <FontAwesomeIcon icon={faSpinner} className="animate-spin" />
-                          Saving...
+                          {uploadingImage ? 'Uploading...' : 'Saving...'}
                         </>
                       ) : (
                         <>
