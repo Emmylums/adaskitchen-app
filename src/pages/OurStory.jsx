@@ -27,58 +27,39 @@ const fetchData = async () => {
         // Fetch chef data - check all possible paths including the Settings page location
         let chefData = null;
         
-        // Define all possible paths where chef data might be stored
-        const possibleChefPaths = [
-            { ref: doc(db, "settings", "chefInfo"), name: "settings/chefInfo" },
-            { ref: doc(db, "chefInformation", "mainChef"), name: "chefInformation/mainChef" },
-            { ref: doc(db, "chef", "info"), name: "chef/info" },
-            // Add more paths if needed
-            { ref: doc(db, "chef", "main"), name: "chef/main" },
-            { ref: doc(db, "about", "chef"), name: "about/chef" }
-        ];
-        
-        // Try each path sequentially
-        for (const path of possibleChefPaths) {
-            try {
-                const snapshot = await getDoc(path.ref);
-                if (snapshot.exists()) {
-                    const data = snapshot.data();
-                    console.log(`Found chef data at: ${path.name}`, data);
+        try {
+                const chefRef = doc(db, "settings", "chefInfo"); 
+                const chefSnapshot = await getDoc(chefRef);
+                console.log(chefSnapshot);
+                
+                if (chefSnapshot.exists()) {
+                    const data = chefSnapshot.data();
+                    console.log("Fetched chef data from settings/chefInfo:", data);
                     
-                    // Parse the data with multiple possible field names
+                    // Map the data to match your Settings.jsx structure
                     chefData = {
-                        id: snapshot.id,
-                        // Try different field names that might be used
-                        name: data.name || data.chefName || data.fullName || "Ada Johnson",
-                        bio: data.bio || data.chefBio || data.description || data.about || 
-                             "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist.",
-                        // Try different image field names
-                        image: data.imageUrl || data.image || data.photoUrl || data.photo || 
-                               data.profileImage || data.profileUrl || null
+                        id: chefSnapshot.id,
+                        name: data.name || "Ada Johnson",
+                        bio: data.bio || "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist.",
+                        image: data.imageUrl || null // This should be the Firebase Storage URL
                     };
-                    console.log("Parsed chef data:", chefData);
-                    break; // Exit loop once found
-                } else {
-                    console.log(`No document found at ${path.name}`);
                 }
-            } catch (pathError) {
-                console.warn(`Error accessing ${path.name}:`, pathError.message);
-                // Continue to next path
+            } catch (chefError) {
+                console.error("Error fetching chef info:", chefError);
             }
-        }
-        
-        // If no chef data found in Firestore, use defaults
-        if (!chefData) {
-            console.log("No chef data found in Firestore, using defaults");
-            chefData = {
-                name: "Ada Johnson",
-                bio: "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist.",
-                image: null
-            };
-        }
-        
-        setChef(chefData);
-        
+            
+            // If no chef data found, use defaults
+            if (!chefData) {
+                console.log("Using default chef data");
+                chefData = {
+                    name: "Ada Johnson",
+                    bio: "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist.",
+                    image: null
+                };
+            }
+            
+            setChef(chefData);
+            
         // Fetch gallery images
         try {
             const galleryRef = collection(db, "gallery");

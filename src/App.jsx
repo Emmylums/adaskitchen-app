@@ -40,6 +40,7 @@ import Checkout from "./users/pages/Checkout";
 import { Elements } from "@stripe/react-stripe-js";
 import { stripePromise } from "./stripe";
 import EmailVerification from "./pages/EmailVerification";
+import Maintenance from "./pages/Maintenance";
 
 
 
@@ -61,12 +62,16 @@ function App() {
       <ScrollToTop/>
       <ScrollToTopButton/>
       <Routes>
-        <Route exact path="/" element={<Home/>}/>
+        {/* <Route exact path="/" element={<Home/>}/>
         <Route exact path="/our-story" element={<OurStory/>}/>
-        <Route exact path="/menu" element={<Menu/>}/>
+        <Route exact path="/menu" element={<Menu/>}/> */}
+
+
         {/* <Route exact path="/catering" element={<Catering/>}/> */}
         {/* <Route exact path="/gallery" element={<Gallery/>}/> */}
-        <Route exact path="/terms-and-conditions" element={<TermsAndConditions/>}/>
+        
+        
+        {/* <Route exact path="/terms-and-conditions" element={<TermsAndConditions/>}/>
         <Route exact path="/privacy-policy" element={<PrivacyPolicy/>}/>
         <Route exact path="/cart" element={<Cart/>}/>
         <Route exact path="/contact-us" element={<ContactUs/>}/>
@@ -75,14 +80,15 @@ function App() {
         <Route exact path="/complete-profile" element={<CompleteProfile/>}/>
         <Route exact path="/forgot-password" element={<ForgotPassword/>}/>
         <Route exact path="/reset-password" element={<ResetPassword/>}/>
-        <Route exact path="/verify-email" element={<EmailVerification/>}/>
+        <Route exact path="/reset-password" element={<ResetPassword/>}/> */}
+        <Route exact path="/" element={<Maintenance/>}/>
         
 
 
 
 
         {/* Users Pages */}
-        <Route path="/user/Dashboard" element={<Dashboard />} />
+        {/* <Route path="/user/Dashboard" element={<Dashboard />} />
         <Route path="/user/Orders" element={<OrderHistory />} />
         <Route
           path="/user/Payments"
@@ -105,21 +111,38 @@ function App() {
 
         <Route path="/user/Notifications" element={<Notifications />} />
         <Route path="/user/Favorites" element={<Favorites />} />
-        <Route path="/user/Addresses" element={<Addresses />} />
+        <Route path="/user/Addresses" element={<Addresses />} /> */}
+        
+        
         {/* <Route path="/user/Support" element={<Support />} /> */}
-        <Route path="/user/Settings" element={<USettings />} />
+        
+        
+        {/* <Route path="/user/Settings" element={<USettings />} /> */}
  
 
 
       {/* Admin Pages */}
-        <Route path="/admin/Dashboard" element={<ManagerDashboard />} />
+        {/* <Route path="/admin/Dashboard" element={<ManagerDashboard />} />
         <Route path="/admin/Menu" element={<MenuManagement />} />
         <Route path="/admin/Categories" element={<Categories />} />
-        <Route path="/admin/Gallery" element={<Gallery />} />
+        <Route path="/admin/Gallery" element={<Gallery />} /> */}
+        
+        
+        
         {/* <Route path="/admin/Catering" element={<ACatering />} /> */}
-        <Route path="/admin/Orders" element={<Orders />} />
+        
+        
+        
+        {/* Unclose too */}
+        {/* <Route path="/admin/Orders" element={<Orders />} /> */}
+        
+        
+        
         {/* <Route path="/admin/Invoices" element={<Invoices />} /> */}
-        <Route path="/admin/settings" element={<Settings />} />
+        
+        
+        
+        {/* <Route path="/admin/settings" element={<Settings />} /> */}
 
 
         <Route path="*" element={<Error statusCode={404} message="Page Not Found" />} />
