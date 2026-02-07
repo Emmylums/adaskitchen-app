@@ -311,7 +311,7 @@ export default function Maintenance() {
                                 What's Cooking...
                             </h2>
                             <div className="flex flex-wrap justify-center gap-4">
-                                {["Jollof Rice", "Egusi Soup", "Pounded Yam", "Suya", "Plantain"].map((dish, index) => (
+                                {["Jollof Rice", "Egusi Soup", "Pounded Yam", "Plantain"].map((dish, index) => (
                                     <motion.span
                                         key={dish}
                                         initial={{ opacity: 0, scale: 0 }}
