@@ -4,7 +4,7 @@ import MobileNavBar from "../components/MobileNavBar";
 import { useState } from "react";
 import { motion } from 'framer-motion';
 import { Link } from "react-router-dom"; 
-import bg from "../assets/background.jpeg";
+import bg from "../assets/bgcont.jpeg";
 import Footer from "../components/Footer";
 
 export default function PrivacyPolicy() {
@@ -89,10 +89,10 @@ export default function PrivacyPolicy() {
 
     // Contact information for data protection
     const contactInfo = {
-        dataProtectionOfficer: "dpo@adaskitchen.com",
-        generalContact: "hello@adaskitchen.com",
-        phone: "+234 912 345 6789",
-        address: "123 Main Street, Lagos Island, Lagos, Nigeria"
+        dataProtectionOfficer: "info@adaskitchen.uk",
+        generalContact: "info@adaskitchen.uk",
+        phone: "+447466385015",
+        address: "Ada’s Kitchen, Brixton Station Road, London, SW9 8PA"
     };
 
     return (

@@ -133,8 +133,13 @@ export default function Cart() {
     }, 0);
   };
 
+  // Delivery is not available – only pickup.
+  // Original delivery fee logic (commented out):
+  // const calculateDelivery = () => {
+  //   return calculateSubtotal() > 200 ? 0 : 8.99;
+  // };
   const calculateDelivery = () => {
-    return calculateSubtotal() > 200 ? 0 : 8.99;
+    return 0; // No delivery fee for pickup
   };
 
   const calculateTotal = () => {
@@ -429,9 +434,15 @@ export default function Cart() {
                                 <span>£0.00</span>
                               </div>
                             )}
+                            {/* Delivery fee section – pickup only, so delivery fee is always £0.00 */}
+                            {/* Original delivery fee display (commented out):
                             <div className="flex justify-between">
                               <span>Delivery Fee</span>
                               <span>{calculateDelivery() === 0 ? 'FREE' : `£${(calculateDelivery()).toFixed(2)}`}</span>
+                            </div> */}
+                            <div className="flex justify-between">
+                              <span>Pickup</span>
+                              <span>No delivery fee</span>
                             </div>
                             <div className="border-t border-gray-200 pt-3 mt-3">
                               <div className="flex justify-between text-lg font-bold">
@@ -442,7 +453,8 @@ export default function Cart() {
                           </div>
         
                           <div className="text-sm text-gray-600 mb-6">
-                            <p>✓ Free delivery on orders over £200</p>
+                            {/* <p>✓ Free delivery on orders over £200</p> */}
+                            <p>✓ Pickup only – no delivery fee</p>
                             <p>✓ Orders prepared fresh daily</p>
                             {unavailableCartItems.length > 0 && (
                               <p className="text-red-600 mt-2">⚠ Unavailable items excluded from total</p>

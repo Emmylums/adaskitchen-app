@@ -5,7 +5,7 @@ import cooking from "../assets/cooking5.jpeg";
 import { motion } from 'framer-motion';
 import { Link } from "react-router-dom";
 import Footer from "../components/Footer";
-import bg from "../assets/background.jpeg";
+import bg from "../assets/bgcont.jpeg";
 import { db } from "../firebaseConfig";
 import { collection, getDocs, query, doc, getDoc } from "firebase/firestore";
 

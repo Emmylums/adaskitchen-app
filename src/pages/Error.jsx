@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import bg from "../assets/background.jpeg";
+import bg from "../assets/bgcont.jpeg";
 import NavBar from '../components/NavBar';
 import MobileNavBar from '../components/MobileNavBar';
 import Footer from '../components/Footer';

@@ -1,8 +1,8 @@
 import { useEffect, useState} from "react";
 import NavBar from "../components/NavBar";
 import MobileNavBar from "../components/MobileNavBar"; 
-import bg from "../assets/background.jpeg";
-import jollof from "../assets/jollof.jpeg";
+import bg from "../assets/bg.jpeg";
+import jollof from "../assets/food2.jpeg";
 import boy from "../assets/boy.png";
 import girl from "../assets/girl.png";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";

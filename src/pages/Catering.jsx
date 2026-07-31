@@ -4,7 +4,7 @@ import MobileNavBar from "../components/MobileNavBar";
 import { useState } from "react";
 import { motion } from 'framer-motion';
 import { Link } from "react-router-dom"; 
-import bg from "../assets/background.jpeg";
+import bg from "../assets/bgcont.jpeg";
 import Footer from "../components/Footer";
 
 export default function Catering() {

@@ -3,7 +3,7 @@ import NavBar from "../components/NavBar";
 import MobileNavBar from "../components/MobileNavBar";
 import { useState } from "react";
 import { motion } from 'framer-motion'; 
-import bg from "../assets/background.jpeg";
+import bg from "../assets/bgcont.jpeg";
 import Footer from "../components/Footer";
 
 export default function TermsAndConditions() {
@@ -19,10 +19,10 @@ export default function TermsAndConditions() {
             title: "Ordering and Payments",
             content: "All orders are subject to availability and confirmation. Prices are subject to change without notice. We accept various payment methods including credit/debit cards and digital wallets. Payment is processed securely through our payment gateway partners."
         },
-        {
-            title: "Delivery Policy",
-            content: "Delivery times are estimates and may vary due to traffic, weather conditions, and order volume. We are not liable for delays beyond our control. Customers must provide accurate delivery addresses. Failed deliveries due to incorrect addresses may result in additional charges."
-        },
+        // {
+        //     title: "Delivery Policy",
+        //     content: "Delivery times are estimates and may vary due to traffic, weather conditions, and order volume. We are not liable for delays beyond our control. Customers must provide accurate delivery addresses. Failed deliveries due to incorrect addresses may result in additional charges."
+        // },
         {
             title: "Cancellations and Refunds",
             content: "Orders can be cancelled within 15 minutes of placement. Once food preparation begins, cancellations may not be possible. Refunds are processed according to our refund policy and may take 5-10 business days to reflect in your account."
@@ -42,10 +42,6 @@ export default function TermsAndConditions() {
         {
             title: "Food Allergies and Dietary Requirements",
             content: "While we take precautions to accommodate dietary needs, we cannot guarantee complete allergen-free preparation. Customers with severe allergies should contact us directly before ordering. We are not liable for allergic reactions."
-        },
-        {
-            title: "Governing Law",
-            content: "These terms are governed by the laws of Nigeria. Any disputes shall be subject to the exclusive jurisdiction of the courts in Lagos, Nigeria."
         },
         {
             title: "Changes to Terms",
@@ -143,9 +139,9 @@ export default function TermsAndConditions() {
                         If you have any questions about these Terms and Conditions, please contact us:
                     </p>
                     <div className="flex flex-col sm:flex-row justify-center gap-6 text-own-2 font-semibold">
-                        <span>📧 hello@adaskitchen.com</span>
-                        <span>📞 +234 912 345 6789</span>
-                        <span>📍 123 Main Street, Lagos Island, Lagos</span>
+                        <span>📧 info@adaskitchen.uk</span>
+                        <span>📞 +447466385015</span>
+                        <span>📍 Ada’s Kitchen, Brixton Station Road, London, SW9 8PA</span>
                     </div>
                 </motion.div>
             </div>

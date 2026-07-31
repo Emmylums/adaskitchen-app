@@ -16,7 +16,7 @@ import {
   faCheckCircle
 } from "@fortawesome/free-solid-svg-icons";
 import { useAuth } from "../context/AuthContext"; 
-import bg from "../assets/background.jpeg";
+import bg from "../assets/bgcont.jpeg";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import { faGoogle } from "@fortawesome/free-brands-svg-icons";

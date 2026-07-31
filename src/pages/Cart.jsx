@@ -8,7 +8,7 @@ import { faCartShopping, faPlus, faTrashCan, faArrowLeft, faBan, faExclamationTr
 import AlertBanner from "../components/AlertBanner";
 import { Link, useNavigate } from "react-router-dom";
 import Footer from "../components/Footer.jsx"; 
-import bg from "../assets/background.jpeg";
+import bg from "../assets/bgcont.jpeg";
 // Firebase imports
 import { getDocs, collection, doc, getDoc } from "firebase/firestore";
 import { db } from "../firebaseConfig";

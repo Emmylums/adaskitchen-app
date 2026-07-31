@@ -19,7 +19,8 @@ import {
   faClock,
   faExclamationTriangle,
   faSpinner,
-  faPlusCircle
+  faPlusCircle,
+  faStore
 } from "@fortawesome/free-solid-svg-icons";
 // Import brand icons correctly
 import { 
@@ -47,7 +48,7 @@ import { db } from "../../firebaseConfig";
 import { useStripe, useElements, CardNumberElement, CardExpiryElement, CardCvcElement } from "@stripe/react-stripe-js";
 import { createNotification, NotificationTemplates } from "../services/notificationService";
 
-// Card type detection utility
+// Card type detection utility (unchanged)
 const getCardType = (number) => {
   const cleanNumber = number.replace(/\D/g, '');
   
@@ -134,7 +135,7 @@ const getCardType = (number) => {
   };
 };
 
-// Card Brand Display Component
+// Card Brand Display Component (unchanged)
 const CardBrandDisplay = ({ cardType }) => {
   if (!cardType) return null;
   
@@ -154,7 +155,8 @@ export default function Checkout() {
   const [alert, setAlert] = useState(null);
   const [loading, setLoading] = useState(false);
   const [menuDishes, setMenuDishes] = useState([]);
-  const [selectedAddress, setSelectedAddress] = useState(null);
+  // PICKUP: We no longer need selectedAddress – kept for future but commented out
+  // const [selectedAddress, setSelectedAddress] = useState(null);
   const [orderConfirmed, setOrderConfirmed] = useState(false);
   const [orderDetails, setOrderDetails] = useState(null);
   const [savedCards, setSavedCards] = useState([]);
@@ -181,7 +183,7 @@ export default function Checkout() {
     lastName: "",
     email: "",
     phone: "",
-    deliveryInstructions: "",
+    // deliveryInstructions: "", // commented out for pickup
     paymentMethod: "wallet",
     saveInfo: false
   });
@@ -198,15 +200,16 @@ export default function Checkout() {
     setIsSidebarOpen(prev => !prev);
   };
 
+  // PICKUP: No address selection needed – this is commented out
   // Get default address from userData
-  useEffect(() => {
-    if (userData?.addresses && userData.addresses.length > 0) {
-      const defaultAddr = userData.addresses.find(addr => addr.isDefault) || userData.addresses[0];
-      setSelectedAddress(defaultAddr);
-    }
-  }, [userData]);
+  // useEffect(() => {
+  //   if (userData?.addresses && userData.addresses.length > 0) {
+  //     const defaultAddr = userData.addresses.find(addr => addr.isDefault) || userData.addresses[0];
+  //     setSelectedAddress(defaultAddr);
+  //   }
+  // }, [userData]);
 
-  // Fetch saved cards
+  // Fetch saved cards (unchanged)
   useEffect(() => {
     if (!userData?.uid) return;
 
@@ -241,7 +244,7 @@ export default function Checkout() {
     }
   }, [userData]);
 
-  // Fetch menu items
+  // Fetch menu items (unchanged)
   useEffect(() => {
     const fetchMenuItems = async () => {
       try {
@@ -285,7 +288,7 @@ export default function Checkout() {
     }));
   };
 
-  // Handle card element change
+  // Handle card element change (unchanged)
   const handleCardElementChange = (event, elementType) => {
     if (event.complete) {
       setCardElementComplete(prev => ({
@@ -314,9 +317,13 @@ export default function Checkout() {
     }, 0);
   };
 
+  // PICKUP: Delivery fee is always 0. Original logic commented out.
+  // const calculateDelivery = () => {
+  //   const subtotal = calculateSubtotal();
+  //   return subtotal > 200 ? 0 : 8.99;
+  // };
   const calculateDelivery = () => {
-    const subtotal = calculateSubtotal();
-    return subtotal > 200 ? 0 : 8.99;
+    return 0; // Pickup only – no delivery fee
   };
 
   const calculateTotal = () => {
@@ -328,7 +335,7 @@ export default function Checkout() {
     return userData.walletBalance >= calculateTotal() * 100;
   };
 
-  // Separate cart items
+  // Separate cart items (unchanged)
   const availableCartItems = [];
   const unavailableCartItems = [];
   
@@ -345,7 +352,7 @@ export default function Checkout() {
     return menuDishes.find(dish => dish.id === itemId);
   };
 
-  // Generate order number
+  // Generate order number (unchanged)
   const generateOrderNumber = () => {
     const timestamp = Date.now().toString();
     const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
@@ -371,15 +378,15 @@ export default function Checkout() {
     
     if (isPaying || isProcessingPayment) return;
     
-    // Validation
-    if (!selectedAddress) {
-      setAlert({
-        message: "Please select a delivery address",
-        type: "error"
-      });
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
+    // PICKUP: No delivery address required – validation commented out
+    // if (!selectedAddress) {
+    //   setAlert({
+    //     message: "Please select a delivery address",
+    //     type: "error"
+    //   });
+    //   window.scrollTo({ top: 0, behavior: 'smooth' });
+    //   return;
+    // }
     
     if (formData.paymentMethod === "wallet" && !isWalletSufficient()) {
       setAlert({
@@ -442,7 +449,7 @@ export default function Checkout() {
         };
       });
 
-      // Prepare order data
+      // Prepare order data – PICKUP: deliveryAddress set to null, deliveryInstructions omitted
       const orderData = {
         customerId: userData.uid,
         customerName: `${formData.firstName} ${formData.lastName}`,
@@ -450,25 +457,29 @@ export default function Checkout() {
         customerPhone: formData.phone,
         items: orderItems,
         subtotal: calculateSubtotal() * 100,
-        deliveryFee: calculateDelivery() * 100,
+        deliveryFee: calculateDelivery() * 100, // 0 for pickup
         total: total * 100,
         walletAmount: walletAmount,
         stripeAmount: stripeAmount,
         paymentMethod: formData.paymentMethod,
         paymentStatus: "pending",
         orderStatus: "pending",
-        deliveryAddress: selectedAddress,
-        deliveryInstructions: formData.deliveryInstructions || "",
+        // deliveryAddress: selectedAddress, // commented out
+        deliveryAddress: null, // pickup only
+        // deliveryInstructions: formData.deliveryInstructions || "", // commented out
+        deliveryInstructions: "",
         orderNumber: generateOrderNumber(),
         createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
+        // PICKUP flag for future reference
+        pickup: true
       };
 
       // 1️⃣ Create order in Firestore
       const orderRef = await addDoc(collection(db, "orders"), orderData);
       const orderId = orderRef.id;
 
-      // 2️⃣ Handle wallet-only payment
+      // 2️⃣ Handle wallet-only payment (unchanged)
       if (formData.paymentMethod === "wallet" && stripeAmount === 0) {
         
         // Deduct from wallet
@@ -520,7 +531,7 @@ export default function Checkout() {
         return;
       }
 
-      // 3️⃣ Handle card payment (with or without wallet)
+      // 3️⃣ Handle card payment (with or without wallet) – mostly unchanged, but note delivery fee is 0
       if (formData.paymentMethod === "card" && stripeAmount > 0) {
         
         try {
@@ -554,7 +565,6 @@ export default function Checkout() {
 
           // Handle CORS and network errors
           if (!paymentIntentResponse.ok) {
-            // Check if it's a CORS issue (status 0 or no response)
             if (paymentIntentResponse.status === 0) {
               throw new Error("Cannot connect to payment server. This may be a temporary issue. Please try again.");
             }
@@ -567,7 +577,6 @@ export default function Checkout() {
 
           // Check if payment requires additional action
           if (paymentIntentResult.requiresAction) {
-            // Handle 3D Secure or other authentication
             const { error: confirmError } = await stripe.handleCardAction(
               paymentIntentResult.clientSecret
             );
@@ -579,7 +588,6 @@ export default function Checkout() {
 
           // If wallet-only payment
           if (paymentIntentResult.walletOnly) {
-            // Handle as wallet payment
             if (walletAmount > 0 && userData?.uid) {
               const userRef = doc(db, "users", userData.uid);
               await updateDoc(userRef, {
@@ -596,7 +604,6 @@ export default function Checkout() {
               updatedAt: serverTimestamp()
             });
 
-            // Create notifications
             await createNotification(userData.uid,
               NotificationTemplates.ORDER_CONFIRMED(orderData.orderNumber, orderData.total)
             );
@@ -630,12 +637,10 @@ export default function Checkout() {
             let paymentResult;
             
             if (useNewCard) {
-              // New card payment using Stripe Elements
               if (!stripe || !elements) {
                 throw new Error("Stripe not loaded. Please refresh the page.");
               }
               
-              // Create a new payment method with the card elements
               const { paymentMethod, error: createPaymentMethodError } = await stripe.createPaymentMethod({
                 type: 'card',
                 card: elements.getElement(CardNumberElement),
@@ -643,10 +648,11 @@ export default function Checkout() {
                   name: cardHolderName,
                   email: userData.email,
                   phone: formData.phone,
+                  // PICKUP: address not needed – set empty or default
                   address: {
-                    line1: selectedAddress.line1 || selectedAddress.address,
-                    city: selectedAddress.city,
-                    postal_code: selectedAddress.postcode,
+                    line1: "Pickup",
+                    city: "Restaurant",
+                    postal_code: "00000",
                     country: 'GB'
                   }
                 }
@@ -656,7 +662,6 @@ export default function Checkout() {
                 throw createPaymentMethodError;
               }
 
-              // Confirm the payment with the new payment method
               paymentResult = await stripe.confirmCardPayment(
                 paymentIntentResult.clientSecret,
                 {
@@ -667,14 +672,11 @@ export default function Checkout() {
               
             } else if (selectedCard) {
               
-              // For saved cards, we need to check if payment intent needs confirmation
               if (paymentIntentResult.requiresConfirmation || paymentIntentResult.status === 'requires_confirmation') {
-                // Confirm with saved payment method
                 paymentResult = await stripe.confirmCardPayment(paymentIntentResult.clientSecret, {
                   payment_method: selectedCard.id
                 });
               } else {
-                // If payment intent is already in a confirmable state, we can retrieve it
                 const paymentIntent = await stripe.retrievePaymentIntent(paymentIntentResult.clientSecret);
                 
                 if (paymentIntent.paymentIntent && paymentIntent.paymentIntent.status === 'requires_confirmation') {
@@ -682,7 +684,6 @@ export default function Checkout() {
                     payment_method: selectedCard.id
                   });
                 } else {
-                  // Payment intent might already be processing or succeeded
                   paymentResult = { paymentIntent: paymentIntent.paymentIntent };
                 }
               }
@@ -694,10 +695,8 @@ export default function Checkout() {
               throw paymentResult.error;
             }
 
-            // Payment succeeded
             if (paymentResult.paymentIntent && paymentResult.paymentIntent.status === "succeeded") {
               
-              // Deduct wallet amount if any
               if (walletAmount > 0 && userData?.uid) {
                 const userRef = doc(db, "users", userData.uid);
                 await updateDoc(userRef, {
@@ -707,7 +706,6 @@ export default function Checkout() {
                 
               }
 
-              // Update order with payment success
               await updateDoc(orderRef, {
                 paymentStatus: "paid",
                 orderStatus: "confirmed",
@@ -718,10 +716,8 @@ export default function Checkout() {
                 updatedAt: serverTimestamp()
               });
 
-              // Save card if requested
               if (saveNewCard && useNewCard && paymentResult.paymentIntent.payment_method) {
                 try {
-                  // Get payment method details
                   const paymentMethodResponse = await fetch(
                     `${API_URL}/payments/payment-method/${paymentResult.paymentIntent.payment_method}`
                   );
@@ -746,28 +742,23 @@ export default function Checkout() {
                       updatedAt: serverTimestamp()
                     });
                     
-                    // Create card added notification
                     await createNotification(userData.uid,
                       NotificationTemplates.CARD_ADDED(paymentMethod.card.last4, paymentMethod.card.brand)
                     );
                   }
                 } catch (error) {
                   console.error("Error saving card:", error);
-                  // Don't fail the order if card saving fails
                 }
               }
 
-              // Create order confirmation notification
               await createNotification(userData.uid,
                 NotificationTemplates.ORDER_CONFIRMED(orderData.orderNumber, orderData.total)
               );
               
-              // Create payment success notification
               await createNotification(userData.uid,
                 NotificationTemplates.PAYMENT_SUCCESS(orderData.total, "card")
               );
               
-              // Create wallet usage notification if wallet was used
               if (walletAmount > 0) {
                 await createNotification(userData.uid,
                   NotificationTemplates.WALLET_USED(
@@ -796,14 +787,12 @@ export default function Checkout() {
         } catch (paymentError) {
           console.error("Payment processing error:", paymentError);
           
-          // Update order with failure
           await updateDoc(orderRef, {
             paymentStatus: "failed",
             paymentError: paymentError.message || "Payment failed",
             updatedAt: serverTimestamp()
           });
           
-          // Create payment failure notification
           await createNotification(userData.uid,
             NotificationTemplates.PAYMENT_FAILED(
               orderData.total,
@@ -811,7 +800,6 @@ export default function Checkout() {
             )
           );
           
-          // Provide user-friendly error message
           let userMessage = paymentError.message;
           if (paymentError.message.includes("Failed to fetch") || paymentError.message.includes("CORS")) {
             userMessage = "Payment service is temporarily unavailable. Please try wallet payment or try again later.";
@@ -853,7 +841,7 @@ export default function Checkout() {
     return availableCartItems.reduce((sum, item) => sum + item.quantity, 0);
   };
 
-  // Loading state
+  // Loading state (unchanged)
   if (userLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -865,7 +853,7 @@ export default function Checkout() {
     );
   }
 
-  // Order Confirmation View
+  // Order Confirmation View – updated for pickup
   if (orderConfirmed && orderDetails) {
     return (
       <>
@@ -907,28 +895,34 @@ export default function Checkout() {
                   <div className="bg-gray-50 p-6 rounded-xl">
                     <div className="flex items-center gap-3 mb-4">
                       <FontAwesomeIcon icon={faClock} className="text-own-2" />
-                      <h3 className="text-lg font-bold text-black">Estimated Delivery</h3>
+                      <h3 className="text-lg font-bold text-black">Estimated Pickup Time</h3>
                     </div>
                     <p className="text-2xl font-bold text-own-2">30-45 minutes</p>
                     <p className="text-gray-600 mt-2">Your food is being prepared</p>
                   </div>
 
+                  {/* PICKUP: replaced delivery address with pickup info */}
                   <div className="bg-gray-50 p-6 rounded-xl">
                     <div className="flex items-center gap-3 mb-4">
-                      <FontAwesomeIcon icon={faMapMarkerAlt} className="text-own-2" />
-                      <h3 className="text-lg font-bold text-black">Delivery Address</h3>
+                      <FontAwesomeIcon icon={faStore} className="text-own-2" />
+                      <h3 className="text-lg font-bold text-black">Pickup Location</h3>
                     </div>
                     <p className="text-gray-800">
+                      Ada's Kitchen<br />
+                      Brixton Station Road<br />
+                      London, UK, SW9 8PA
+                    </p>
+                    {/* <p className="text-gray-800">
                       {selectedAddress?.line1 || selectedAddress?.address}
                       {selectedAddress?.line2 && <>, {selectedAddress.line2}</>}
                       {selectedAddress?.city && <>, {selectedAddress.city}</>}
                       {selectedAddress?.postcode && <>, {selectedAddress.postcode}</>}
-                    </p>
-                    {orderDetails.deliveryInstructions && (
+                    </p> */}
+                    {/* {orderDetails.deliveryInstructions && (
                       <p className="text-gray-600 mt-2 text-sm">
                         <span className="font-medium text-black">Instructions:</span> {orderDetails.deliveryInstructions}
                       </p>
-                    )}
+                    )} */}
                   </div>
 
                   <div className="bg-gray-50 p-6 rounded-xl">
@@ -942,8 +936,8 @@ export default function Checkout() {
                         <span>£{(orderDetails.subtotal / 100).toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Delivery</span>
-                        <span>£{(orderDetails.deliveryFee / 100).toFixed(2)}</span>
+                        <span>Pickup</span>
+                        <span>£0.00</span>
                       </div>
                       <div className="border-t pt-2 mt-2">
                         <div className="flex justify-between font-bold text-lg">
@@ -1039,7 +1033,7 @@ export default function Checkout() {
     );
   }
 
-  // Checkout Form View
+  // Checkout Form View – updated for pickup
   if (cart.length === 0 && !orderConfirmed) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -1084,13 +1078,13 @@ export default function Checkout() {
                     {/* Checkout Form */}
                     <div className="lg:col-span-2">
                       <form onSubmit={handleSubmit} className="space-y-8">
-                        {/* Delivery Information */}
+                        {/* PICKUP: Replaced "Delivery Information" with "Pickup Information" */}
                         <div className="bg-white rounded-2xl shadow-lg p-6">
                           <div className="flex items-center gap-3 mb-6">
                             <div className="bg-own-2 text-white p-2 rounded-full">
                               <FontAwesomeIcon icon={faUser} />
                             </div>
-                            <h2 className="text-xl font-bold text-own-2">Delivery Information</h2>
+                            <h2 className="text-xl font-bold text-own-2">Pickup Information</h2>
                             {userData && (
                               <span className="text-sm text-green-600 bg-green-50 px-3 py-1 rounded-full">
                                 ✓ Logged in as {userData.firstName}
@@ -1165,91 +1159,31 @@ export default function Checkout() {
                                     required
                                   />
                                 </div>
-                                <p className="text-xs text-gray-500 mt-1">Used for delivery updates</p>
+                                <p className="text-xs text-gray-500 mt-1">Used for order updates</p>
                               </div>
                             </div>
                           </div>
                           
+                          {/* PICKUP: Address selection completely replaced with pickup message */}
                           <div className="mb-6">
-                            <h3 className="text-lg font-medium text-gray-800 mb-4">Delivery Address</h3>
-                            
-                            {userData?.addresses && userData.addresses.length > 0 ? (
-                              <div className="space-y-3">
-                                {userData.addresses.map((address, index) => (
-                                  <div 
-                                    key={address.id || index}
-                                    className={`p-4 border rounded-xl cursor-pointer transition-all ${
-                                      selectedAddress?.id === address.id
-                                        ? 'border-own-2 bg-own-2/5'
-                                        : 'border-gray-200 hover:border-own-2'
-                                    }`}
-                                    onClick={() => setSelectedAddress(address)}
-                                  >
-                                    <div className="flex items-start justify-between">
-                                      <div>
-                                        <div className="flex items-center gap-2 mb-1">
-                                          <FontAwesomeIcon 
-                                            icon={faMapMarkerAlt} 
-                                            className={`${
-                                              selectedAddress?.id === address.id 
-                                                ? 'text-own-2' 
-                                                : 'text-gray-400'
-                                            }`}
-                                          />
-                                          <span className="font-medium text-gray-800">{address.name || address.label || "Address"}</span>
-                                          {address.isDefault && (
-                                            <span className="px-2 py-0.5 bg-own-2 text-white text-xs rounded-full">Default</span>
-                                          )}
-                                        </div>
-                                        <p className="text-sm text-gray-600">
-                                          {address.line1 || address.street || address.address}
-                                          {address.line2 && <>, {address.line2}</>}
-                                          {address.city && <>, {address.city}</>}
-                                          {address.county && <>, {address.county}</>}
-                                          {address.postcode && <>, {address.postcode}</>}
-                                          {address.country && <>, {address.country}</>}
-                                        </p>
-                                        {address.phone && (
-                                          <p className="text-sm text-gray-600 mt-1">
-                                            <FontAwesomeIcon icon={faPhone} className="mr-1" />
-                                            {address.phone}
-                                          </p>
-                                        )}
-                                        {address.instructions && (
-                                          <p className="text-sm text-gray-500 mt-1">
-                                            Instructions: {address.instructions}
-                                          </p>
-                                        )}
-                                      </div>
-                                      {selectedAddress?.id === address.id && (
-                                        <div className="bg-own-2 text-white p-2 rounded-full">
-                                          <FontAwesomeIcon icon={faCheckCircle} />
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-xl">
-                                <FontAwesomeIcon icon={faMapMarkerAlt} className="text-4xl text-gray-300 mb-3" />
-                                <h4 className="text-lg font-semibold text-gray-600 mb-2">
-                                  No saved addresses
-                                </h4>
-                                <p className="text-gray-500 mb-4">
-                                  Please add an address to continue with checkout
+                            <h3 className="text-lg font-medium text-gray-800 mb-4">Pickup Location</h3>
+                            <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+                              <FontAwesomeIcon icon={faStore} className="text-own-2 text-xl mt-1" />
+                              <div>
+                                <p className="font-medium text-gray-800">Ada's Kitchen</p>
+                                <p className="text-sm text-gray-600">
+                                  Brixton Station Road<br />
+                                  London, UK, SW9 8PA
                                 </p>
-                                <Link
-                                  to="/user/addresses"
-                                  className="inline-block bg-own-2 text-white px-6 py-3 rounded-xl hover:bg-amber-600 transition-colors"
-                                >
-                                  Add Address
-                                </Link>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Your order will be ready for pickup at this location.
+                                </p>
                               </div>
-                            )}
+                            </div>
                           </div>
                           
-                          <div>
+                          {/* PICKUP: Delivery Instructions removed – kept commented */}
+                          {/* <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                               Delivery Instructions (Optional)
                             </label>
@@ -1261,10 +1195,10 @@ export default function Checkout() {
                               className="w-full px-4 py-3 text-black border border-gray-300 rounded-xl focus:ring-2 focus:ring-own-2 focus:border-transparent"
                               placeholder="Leave at door, ring bell, call on arrival, etc."
                             />
-                          </div>
+                          </div> */}
                         </div>
 
-                        {/* Payment Method */}
+                        {/* Payment Method section unchanged */}
                         <div className="bg-white rounded-2xl shadow-lg p-6">
                           <div className="flex items-center gap-3 mb-6">
                             <div className="bg-own-2 text-white p-2 rounded-full">
@@ -1350,7 +1284,6 @@ export default function Checkout() {
                                       <span className="text-black font-medium">Credit/Debit Card</span>
                                       <p className="text-sm text-gray-600">Pay securely with your card</p>
                                     </div>
-                                    {/* Colorful card brand icons */}
                                     <div className="flex gap-1">
                                       <div className="w-8 h-5 bg-gradient-to-r from-blue-400 to-blue-600 rounded flex items-center justify-center">
                                         <FontAwesomeIcon icon={faCcVisa} className="text-white text-xs" />
@@ -1371,7 +1304,7 @@ export default function Checkout() {
                             </div>
                           </div>
 
-                          {/* Card Details Section */}
+                          {/* Card Details Section (unchanged) */}
                           {formData.paymentMethod === "card" && (
                             <motion.div
                               initial={{ opacity: 0, height: 0 }}
@@ -1593,15 +1526,15 @@ export default function Checkout() {
                           )}
                         </div>
 
-                        {/* Submit Section */}
+                        {/* Submit Section – validation updated for pickup */}
                         <div className="bg-white rounded-2xl shadow-lg p-6">
-                          {/* Validation Messages */}
-                          {!selectedAddress && (
+                          {/* PICKUP: Removed address validation message */}
+                          {/* {!selectedAddress && (
                             <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
                               <FontAwesomeIcon icon={faExclamationTriangle} className="mr-2" />
                               Please select a delivery address to continue.
                             </div>
-                          )}
+                          )} */}
                           
                           {formData.paymentMethod === "wallet" && !isWalletSufficient() && (
                             <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
@@ -1649,14 +1582,17 @@ export default function Checkout() {
                                 loading || 
                                 isPaying || 
                                 availableCartItems.length === 0 || 
-                                !selectedAddress || 
+                                // PICKUP: removed address requirement
+                                // !selectedAddress || 
                                 (formData.paymentMethod === "wallet" && !isWalletSufficient()) ||
                                 (formData.paymentMethod === "card" && savedCards.length === 0 && !useNewCard) ||
                                 (formData.paymentMethod === "card" && savedCards.length > 0 && !selectedCard && !useNewCard) ||
                                 (formData.paymentMethod === "card" && useNewCard && (!cardHolderName || !cardElementComplete.cardNumber || !cardElementComplete.cardExpiry || !cardElementComplete.cardCvc))
                               }
                               className={`flex-1 py-4 font-bold rounded-xl transition-colors shadow-md flex items-center justify-center gap-2 ${
-                                loading || isPaying || availableCartItems.length === 0 || !selectedAddress || 
+                                loading || isPaying || availableCartItems.length === 0 || 
+                                // PICKUP: removed address condition
+                                // !selectedAddress || 
                                 (formData.paymentMethod === "wallet" && !isWalletSufficient()) ||
                                 (formData.paymentMethod === "card" && savedCards.length === 0 && !useNewCard) ||
                                 (formData.paymentMethod === "card" && savedCards.length > 0 && !selectedCard && !useNewCard) ||
@@ -1686,7 +1622,7 @@ export default function Checkout() {
                       </form>
                     </div>
 
-                    {/* Order Summary */}
+                    {/* Order Summary – updated for pickup */}
                     <div className="lg:col-span-1">
                       <div className="bg-white rounded-2xl shadow-lg p-6 sticky top-6">
                         <div className="flex items-center gap-3 mb-6">
@@ -1743,6 +1679,15 @@ export default function Checkout() {
                             <span>£{(calculateSubtotal()).toFixed(2)}</span>
                           </div>
                           
+                          {/* PICKUP: replaced delivery fee with pickup */}
+                          <div className="flex justify-between">
+                            <span className="flex items-center gap-2">
+                              <FontAwesomeIcon icon={faStore} className="text-gray-400" />
+                              Pickup
+                            </span>
+                            <span>£0.00</span>
+                          </div>
+                          {/* Original delivery fee row commented out:
                           <div className="flex justify-between">
                             <span className="flex items-center gap-2">
                               <FontAwesomeIcon icon={faTruck} className="text-gray-400" />
@@ -1750,6 +1695,7 @@ export default function Checkout() {
                             </span>
                             <span>{calculateDelivery() === 0 ? 'FREE' : `£${(calculateDelivery()).toFixed(2)}`}</span>
                           </div>
+                          */}
                           
                           <div className="border-t border-gray-200 pt-3 mt-3">
                             <div className="flex justify-between text-lg font-bold">
@@ -1790,13 +1736,14 @@ export default function Checkout() {
                           )}
                         </div>
                         
+                        {/* PICKUP: updated estimated pickup time */}
                         <div className="bg-gray-50 rounded-xl p-4 mb-6">
-                          <h4 className="font-medium text-gray-800 mb-2">Estimated Delivery</h4>
+                          <h4 className="font-medium text-gray-800 mb-2">Estimated Pickup Time</h4>
                           <p className="text-sm text-gray-600">
                             <span className="font-medium text-own-2">30-45 minutes</span> after order confirmation
                           </p>
                           <p className="text-xs text-gray-500 mt-2">
-                            Orders are prepared fresh and delivered hot to your door
+                            Your order will be ready for pickup at our restaurant
                           </p>
                         </div>
                         

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import NavBar from "../components/NavBar";
 import MobileNavBar from "../components/MobileNavBar";
-import bg from "../assets/background.jpeg";
+import bg from "../assets/bgcont.jpeg";
 import { motion } from 'framer-motion';
 import { Link } from "react-router-dom";
 import Footer from "../components/Footer";

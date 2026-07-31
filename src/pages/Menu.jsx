@@ -7,7 +7,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch, faShoppingCart, faPlus, faMinus, faFilter, faStoreAltSlash } from "@fortawesome/free-solid-svg-icons";
 import AlertBanner from "../components/AlertBanner";
 import { useCart } from "../context/CartContext"; 
-import bg from "../assets/background.jpeg";
+import bg from "../assets/bgcont.jpeg";
 import Footer from "../components/Footer";
 import { db } from "../firebaseConfig";
 import { collection, getDocs, query, doc, getDoc } from "firebase/firestore";

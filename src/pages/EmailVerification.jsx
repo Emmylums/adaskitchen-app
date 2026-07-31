@@ -4,7 +4,7 @@ import MobileNavBar from "../components/MobileNavBar";
 import { motion } from 'framer-motion';
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Footer from "../components/Footer"; 
-import bg from "../assets/background.jpeg";
+import bg from "../assets/bgcont.jpeg";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { 
   faCheckCircle, 

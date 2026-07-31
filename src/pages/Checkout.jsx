@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { useCart } from "../context/CartContext";
 import AlertBanner from "../components/AlertBanner";
 import { useNavigate } from "react-router-dom"; 
-import bg from "../assets/background.jpeg";
+import bg from "../assets/bgcont.jpeg";
 import Footer from "../components/Footer";
 
 export default function Checkout() {
