@@ -314,24 +314,12 @@ export default function Home() {
 
     const testimonials = [
         {
-            name: "John Doe",
-            description: "Original recipe simmered in a rich tomato and pepper sauce, served with tender Grilled Chicken, Sweet Fried Plantains, and a side of Spicy Slaw for that perfect crunch.",
-            image: girl,
+            name: "Paul",
+            description: "That was very tasty food Frank",
         },
         {
-            name: "Janet Abowale",
-            description: "Original recipe simmered in a rich tomato and pepper sauce, served with tender Grilled Chicken, Sweet Fried Plantains, and a side of Spicy Slaw for that perfect crunch.",
-            image: boy,
-        },
-        {
-            name: "James Carioke",
-            description: "Original recipe simmered in a rich tomato and pepper sauce, served with tender Grilled Chicken, Sweet Fried Plantains, and a side of Spicy Slaw for that perfect crunch.",
-            image: girl,
-        },
-        {
-            name: "Blah blah",
-            description: "Original recipe simmered in a rich tomato and pepper sauce, served with tender Grilled Chicken, Sweet Fried Plantains, and a side of Spicy Slaw for that perfect crunch.",
-            image: boy,
+            name: "K & B",
+            description: "The food was great - very tasty.",
         },
     ]
 

@@ -4,14 +4,14 @@ import MobileNavBar from "../components/MobileNavBar";
 import { motion } from 'framer-motion';
 import { useCart } from "../context/CartContext"; 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCartShopping, faPlus, faTrashCan, faArrowLeft, faBan, faExclamationTriangle } from "@fortawesome/free-solid-svg-icons";
+import { faCartShopping, faPlus, faTrashCan, faArrowLeft, faBan, faExclamationTriangle, faStoreAltSlash } from "@fortawesome/free-solid-svg-icons";
 import AlertBanner from "../components/AlertBanner";
 import { Link, useNavigate } from "react-router-dom";
 import Footer from "../components/Footer.jsx"; 
 import bg from "../assets/background.jpeg";
 // Firebase imports
-import { getDocs, collection } from "firebase/firestore";
-import { db } from "../firebaseConfig"; // Adjust this path
+import { getDocs, collection, doc, getDoc } from "firebase/firestore";
+import { db } from "../firebaseConfig";
 
 export default function Cart() {
   const [mobileNavBarVisible, setMobileNavBarVisible] = useState(false);
@@ -19,43 +19,38 @@ export default function Cart() {
   const [alert, setAlert] = useState(null);
   const [menuDishes, setMenuDishes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null); 
+  const [error, setError] = useState(null);
+  const [isRestaurantOpen, setIsRestaurantOpen] = useState(true);
+  const [statusLoading, setStatusLoading] = useState(true);
 
   const navigate = useNavigate();
 
-
-  const handleCheckoutRedirect = () => {
-    if (availableCartItems.length === 0) return;
-    
-    // Save current cart as pending transfer using CartContext
-    const saveSuccess = savePendingCart(cart);
-    
-    if (saveSuccess) {
-      // Redirect to login with checkout as destination
-      // window.location.href = `/login?redirect=${encodeURIComponent('/user/checkout')}`;
-      // OR if using React Router navigate:
-      navigate(`/login?redirect=${encodeURIComponent('/user/checkout')}`);
-    } else {
-      setAlert({ 
-        message: 'Failed to save cart. Please try again.', 
-        type: 'error' 
-      });
-      setTimeout(() => setAlert(null), 3000);
-    }
-  };
-
-  // Fetch dishes from Firebase menus collection
+  // Fetch restaurant status and menu items
   useEffect(() => {
-    const fetchMenuItems = async () => {
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        setLoading(true);
+        // 1. Fetch restaurant status
+        try {
+          const statusRef = doc(db, "settings", "restaurantStatus");
+          const statusSnap = await getDoc(statusRef);
+          if (statusSnap.exists()) {
+            setIsRestaurantOpen(statusSnap.data().isOpen !== undefined ? statusSnap.data().isOpen : true);
+          } else {
+            setIsRestaurantOpen(true);
+          }
+        } catch (statusError) {
+          console.error("Error fetching restaurant status:", statusError);
+          setIsRestaurantOpen(true);
+        }
+        setStatusLoading(false);
+
+        // 2. Fetch menu items (to check availability)
         const querySnapshot = await getDocs(collection(db, "menus"));
         const dishesArray = [];
-        
         querySnapshot.forEach((doc) => {
           const dishData = doc.data();
-          
-          // Map Firebase document fields to your expected structure
           dishesArray.push({
             id: doc.id,
             name: dishData.name || dishData.menuItemName || `Dish ${doc.id}`,
@@ -68,21 +63,41 @@ export default function Cart() {
             originalIndex: dishesArray.length
           });
         });
-        
         setMenuDishes(dishesArray);
-        setError(null);
       } catch (err) {
-        console.error("Error fetching menu items: ", err);
-        setError("Failed to load menu items. Please try again.");
+        console.error("Error fetching data: ", err);
+        setError("Failed to load cart data. Please try again.");
+        // fallback: assume open
+        setIsRestaurantOpen(true);
       } finally {
         setLoading(false);
       }
     };
-    
-    fetchMenuItems();
+    fetchData();
   }, []);
 
+  const handleCheckoutRedirect = () => {
+    if (availableCartItems.length === 0) return;
+    if (!isRestaurantOpen) {
+      setAlert({ message: "Restaurant is closed. Checkout is disabled.", type: "error" });
+      setTimeout(() => setAlert(null), 3000);
+      return;
+    }
+    const saveSuccess = savePendingCart(cart);
+    if (saveSuccess) {
+      navigate(`/login?redirect=${encodeURIComponent('/user/checkout')}`);
+    } else {
+      setAlert({ message: 'Failed to save cart. Please try again.', type: 'error' });
+      setTimeout(() => setAlert(null), 3000);
+    }
+  };
+
   const handleQuantityChange = (id, newQuantity) => {
+    if (!isRestaurantOpen) {
+      setAlert({ message: "Cannot update cart while restaurant is closed.", type: "error" });
+      setTimeout(() => setAlert(null), 2000);
+      return;
+    }
     updateQuantity(id, newQuantity);
     setAlert({ message: 'Quantity updated', type: 'success' });
     setTimeout(() => setAlert(null), 2000);
@@ -95,11 +110,13 @@ export default function Cart() {
   };
 
   const handleAddToCart = (dish) => {
+    if (!isRestaurantOpen) {
+      setAlert({ message: "Restaurant is closed. Cannot add items.", type: "error" });
+      setTimeout(() => setAlert(null), 2000);
+      return;
+    }
     if (!dish.available) {
-      setAlert({ 
-        message: `${dish.name} is currently unavailable`, 
-        type: 'error' 
-      });
+      setAlert({ message: `${dish.name} is currently unavailable`, type: 'error' });
       setTimeout(() => setAlert(null), 2000);
       return;
     }
@@ -110,22 +127,17 @@ export default function Cart() {
 
   const calculateSubtotal = () => {
     return cart.reduce((total, item) => {
-      // Check if item is still available
       const dishDetails = menuDishes.find(dish => dish.id === item.id);
       if (dishDetails && !dishDetails.available) return total;
       return total + (item.price * item.quantity);
     }, 0);
   };
 
-  const calculateDelivery = () => {
-    return calculateSubtotal() > 5000 ? 0 : 800;
-  };
-
   const calculateTotal = () => {
     return calculateSubtotal();
   };
 
-  // Filter related dishes from Firebase data (only available ones)
+  // Filter related dishes (only available ones)
   const relatedDishes = menuDishes
     .filter(dish => dish.available && !cart.some(cartItem => cartItem.id === dish.id))
     .slice(0, 4);
@@ -133,7 +145,6 @@ export default function Cart() {
   // Separate cart items into available and unavailable
   const availableCartItems = [];
   const unavailableCartItems = [];
-  
   cart.forEach(item => {
     const dishDetails = menuDishes.find(dish => dish.id === item.id);
     if (dishDetails && !dishDetails.available) {
@@ -142,13 +153,29 @@ export default function Cart() {
       availableCartItems.push({ ...item, available: true });
     }
   });
-
-  // Combine with unavailable items at the bottom
   const sortedCartItems = [...availableCartItems, ...unavailableCartItems];
+
+  if (loading || statusLoading) {
+    return (
+      <>
+        <NavBar activeLink="Cart" onToggleMobileNavBar={() => setMobileNavBarVisible(!mobileNavBarVisible)} />
+        <MobileNavBar isVisible={mobileNavBarVisible} activeLink="Cart" onClose={() => setMobileNavBarVisible(false)} className="md:col-span-1 pt-7" />
+        <div className="flex justify-center items-center h-screen bg-own-1">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-own-2 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading cart...</p>
+          </div>
+        </div>
+        <Footer/>
+      </>
+    );
+  }
 
   return (
     <>
-      {alert && <AlertBanner message={alert.message} type={alert.type} onClose={() => setAlert(null)} />}
+      {alert && (
+        <AlertBanner message={alert.message} type={alert.type} onClose={() => setAlert(null)} />
+      )}
 
       <NavBar activeLink="Cart" onToggleMobileNavBar={() => setMobileNavBarVisible(!mobileNavBarVisible)} />
       <MobileNavBar isVisible={mobileNavBarVisible} activeLink="Cart" onClose={() => setMobileNavBarVisible(false)} className="md:col-span-1 pt-7" />
@@ -166,6 +193,17 @@ export default function Cart() {
       </section>
 
       <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+        {/* Restaurant closed banner */}
+        {!isRestaurantOpen && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center">
+            <FontAwesomeIcon icon={faStoreAltSlash} className="text-red-500 text-2xl mr-3" />
+            <div>
+              <p className="text-red-700 font-semibold">Restaurant is currently closed</p>
+              <p className="text-red-600 text-sm">Orders cannot be placed. You can still review your cart, but checkout is disabled.</p>
+            </div>
+          </div>
+        )}
+
         {cart.length === 0 ? (
           // Empty Cart State
           <div className="text-center py-16">
@@ -224,10 +262,10 @@ export default function Cart() {
 
                 <div className="space-y-6">
                   {sortedCartItems.map(item => {
-                    // Find the current dish details from Firebase data
                     const dishDetails = menuDishes.find(dish => dish.id === item.id);
                     const isAvailable = dishDetails ? dishDetails.available : true;
-                    
+                    const canModify = isAvailable && isRestaurantOpen;
+
                     return (
                       <div 
                         key={item.id} 
@@ -246,6 +284,11 @@ export default function Cart() {
                               <FontAwesomeIcon icon={faBan} className="text-white text-sm" />
                             </div>
                           )}
+                          {!isRestaurantOpen && isAvailable && (
+                            <div className="absolute inset-0 bg-black bg-opacity-40 rounded-xl flex items-center justify-center">
+                              <FontAwesomeIcon icon={faStoreAltSlash} className="text-white text-sm" />
+                            </div>
+                          )}
                         </div>
                         
                         <div className="flex-1 min-w-0">
@@ -260,6 +303,11 @@ export default function Cart() {
                                 Unavailable
                               </span>
                             )}
+                            {!isRestaurantOpen && isAvailable && (
+                              <span className="ml-2 px-2 py-1 bg-orange-100 text-orange-800 text-xs font-medium rounded-full">
+                                Orders Paused
+                              </span>
+                            )}
                           </div>
                           <p className="text-gray-600 mb-2">£{(item.price).toFixed(2)} each</p>
                           <p className={`text-lg font-bold ${isAvailable ? 'text-own-2' : 'text-gray-500 line-through'}`}>
@@ -271,7 +319,7 @@ export default function Cart() {
                         </div>
 
                         <div className="flex flex-col items-end gap-3">
-                          {isAvailable ? (
+                          {canModify ? (
                             <>
                               <div className="flex items-center gap-2 bg-gray-100 rounded-full px-3 py-1">
                                 <button
@@ -313,9 +361,7 @@ export default function Cart() {
                                 >
                                   −
                                 </button>
-
                                 <span className="w-8 text-center font-semibold text-gray-500">{item.quantity}</span>
-
                                 <button
                                   disabled
                                   className="w-8 h-8 rounded-full bg-gray-300 text-gray-500 cursor-not-allowed"
@@ -323,7 +369,6 @@ export default function Cart() {
                                   +
                                 </button>
                               </div>
-
                               <button
                                 onClick={() => handleRemoveFromCart(item.id, item.name)}
                                 className="text-red-500 hover:text-red-700 text-sm flex items-center gap-1"
@@ -340,7 +385,7 @@ export default function Cart() {
                 </div>
               </div>
 
-              {/* Related Dishes (only available ones) */}
+              {/* Related Dishes */}
               {!loading && relatedDishes.length > 0 && (
                 <div className="mt-8 bg-white rounded-2xl shadow-lg p-6">
                   <h3 className="text-xl font-bold text-own-2 mb-4">You might also like</h3>
@@ -356,9 +401,14 @@ export default function Cart() {
                         <p className="text-xs text-gray-600 mb-2">£{(dish.price).toFixed(2)}</p>
                         <button
                           onClick={() => handleAddToCart(dish)}
-                          className="text-xs bg-own-2 text-white px-3 py-1 rounded-full hover:bg-amber-600 transition-colors"
+                          disabled={!isRestaurantOpen}
+                          className={`text-xs px-3 py-1 rounded-full transition-colors ${
+                            isRestaurantOpen 
+                              ? 'bg-own-2 text-white hover:bg-amber-600' 
+                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          }`}
                         >
-                          Add +
+                          {isRestaurantOpen ? 'Add +' : 'Closed'}
                         </button>
                       </div>
                     ))}
@@ -366,7 +416,6 @@ export default function Cart() {
                 </div>
               )}
 
-              {/* Loading state for related dishes */}
               {loading && (
                 <div className="mt-8 bg-white rounded-2xl shadow-lg p-6">
                   <h3 className="text-xl font-bold text-own-2 mb-4">You might also like</h3>
@@ -383,7 +432,6 @@ export default function Cart() {
                 </div>
               )}
 
-              {/* Error state for related dishes */}
               {error && !loading && (
                 <div className="mt-8 bg-white rounded-2xl shadow-lg p-6">
                   <h3 className="text-xl font-bold text-own-2 mb-4">You might also like</h3>
@@ -428,20 +476,27 @@ export default function Cart() {
                       ⚠ Unavailable items are excluded from the total
                     </p>
                   )}
+                  {!isRestaurantOpen && (
+                    <p className="text-red-600 mt-2 font-semibold">
+                      ⚠ Restaurant is currently closed – checkout disabled
+                    </p>
+                  )}
                 </div>
 
                 <button 
-                  onClick={() => handleCheckoutRedirect()}
+                  onClick={handleCheckoutRedirect}
                   className={`w-full py-4 font-bold rounded-xl transition-colors shadow-md ${
-                    availableCartItems.length > 0
+                    availableCartItems.length > 0 && isRestaurantOpen
                       ? 'bg-own-2 text-white hover:bg-amber-600'
                       : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   }`}
-                  disabled={availableCartItems.length === 0}
+                  disabled={availableCartItems.length === 0 || !isRestaurantOpen}
                 >
-                  {availableCartItems.length > 0 
-                    ? 'Proceed to Checkout' 
-                    : 'Add available items to checkout'}
+                  {!isRestaurantOpen 
+                    ? 'Restaurant Closed' 
+                    : availableCartItems.length > 0 
+                      ? 'Proceed to Checkout' 
+                      : 'Add available items to checkout'}
                 </button>
 
                 <Link to="/menu">

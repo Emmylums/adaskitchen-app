@@ -2,13 +2,15 @@ import React, { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion, useInView } from 'framer-motion';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSearch, faShoppingCart, faPlus, faMinus, faFilter, faBan } from "@fortawesome/free-solid-svg-icons";
+import { faSearch, faShoppingCart, faPlus, faMinus, faFilter, faBan, faStoreAltSlash } from "@fortawesome/free-solid-svg-icons";
 import AlertBanner from "../../components/AlertBanner";
 import { useCart } from "../../context/CartContext";
 import UserNavBar from "../components/UserNavbar";
 import UserSideBar from "../components/UserSidebar";
 import { getMenuItems, getCategories } from "../services/menuService"; 
 import { useUserData } from "../hooks/useUserData";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../../firebaseConfig";
 
 export default function Menu() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -23,32 +25,45 @@ export default function Menu() {
   const [alert, setAlert] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isRestaurantOpen, setIsRestaurantOpen] = useState(true);
+  const [statusLoading, setStatusLoading] = useState(true);
 
-  // State for menu data
   const [menuItems, setMenuItems] = useState([]);
   const [categories, setCategories] = useState(["All"]);
 
   const { addToCart, getTotalItems } = useCart();
-
   const { userData, loading: userLoading } = useUserData();
 
-  // Fetch menu data on component mount
+  // Fetch menu data and restaurant status
   useEffect(() => {
-    const fetchMenuData = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
+        // 1. Fetch restaurant status
+        try {
+          const statusRef = doc(db, "settings", "restaurantStatus");
+          const statusSnap = await getDoc(statusRef);
+          if (statusSnap.exists()) {
+            setIsRestaurantOpen(statusSnap.data().isOpen !== undefined ? statusSnap.data().isOpen : true);
+          } else {
+            setIsRestaurantOpen(true);
+          }
+        } catch (statusError) {
+          console.error("Error fetching restaurant status:", statusError);
+          setIsRestaurantOpen(true);
+        }
+        setStatusLoading(false);
+
+        // 2. Fetch menu items
         const [items, cats] = await Promise.all([
           getMenuItems(),
           getCategories()
         ]);
-        
-        // Sort items: available first, then unavailable
         const sortedItems = [...items].sort((a, b) => {
           if (a.available && !b.available) return -1;
           if (!a.available && b.available) return 1;
           return 0;
         });
-        
         setMenuItems(sortedItems);
         setCategories(cats);
         setError(null);
@@ -59,29 +74,22 @@ export default function Menu() {
         setLoading(false);
       }
     };
-
-    fetchMenuData();
+    fetchData();
   }, []);
 
-  // Filter and sort items based on search, category, and availability
   const filteredItems = menuItems.filter(item => {
     const matchesSearch = searchTerm.trim() === "" || 
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (item.description && item.description.toLowerCase().includes(searchTerm.toLowerCase()));
-    
     const matchesCategory = selectedCategory === "All" || item.category === selectedCategory;
-    
     return matchesSearch && matchesCategory;
   }).sort((a, b) => {
-    // Always sort by availability: available items first
     if (a.available && !b.available) return -1;
     if (!a.available && b.available) return 1;
     return 0;
   });
 
   const [quantities, setQuantities] = useState({});
-
-  // Initialize quantities when menu items are loaded
   useEffect(() => {
     if (menuItems.length > 0) {
       const initialQuantities = {};
@@ -98,14 +106,17 @@ export default function Menu() {
   };
 
   const increaseQuantity = (id) => {
+    if (!isRestaurantOpen) return;
     setQuantities(prev => ({ ...prev, [id]: prev[id] + 1 }));
   };
 
   const decreaseQuantity = (id) => {
+    if (!isRestaurantOpen) return;
     setQuantities(prev => ({ ...prev, [id]: Math.max(prev[id] - 1, 1) }));
   };
 
   const handleInputChange = (e, id) => {
+    if (!isRestaurantOpen) return;
     const value = e.target.value;
     if (value === "") {
       setQuantities(prev => ({ ...prev, [id]: "" }));
@@ -118,6 +129,7 @@ export default function Menu() {
   };
 
   const handleInputBlur = (id) => {
+    if (!isRestaurantOpen) return;
     setQuantities(prev => ({
       ...prev,
       [id]: prev[id] === "" || prev[id] < 1 ? 1 : prev[id]
@@ -125,8 +137,11 @@ export default function Menu() {
   };
 
   const handleAddToCart = (item) => {
+    if (!isRestaurantOpen) {
+      showAlert("Restaurant is currently closed. Cannot add items.", "error");
+      return;
+    }
     if (!item.available) return;
-    
     const quantity = quantities[item.id] || 1;
     addToCart(item, quantity);
     showAlert(`${quantity} ${item.name} added to cart!`, "success");
@@ -141,24 +156,40 @@ export default function Menu() {
     ));
   };
 
+  if (loading || statusLoading || userLoading) {
+    return (
+      <>
+        <UserNavBar toggleSidebar={toggleSidebars} isSideBarOpen={isSidebarOpen} userData={userData} />
+        <UserSideBar isOpen={isSidebarOpen} closeSidebar={closeSidebar} userData={userData} setActiveTab={setActiveTab} activeTab={activeTab} />
+        <div className="lg:flex lg:justify-end">
+          <div className={`pt-32 px-5 ${isSidebarOpen ? "lg:w-[75%]" : "lg:w-full"} transition-all duration-500`}>
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-own-2 mx-auto"></div>
+              <p className="mt-4 text-lg text-gray-600">Loading menu...</p>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
       {alert && <AlertBanner message={alert.message} type={alert.type} onClose={() => setAlert(null)} />}
-      <UserNavBar toggleSidebar={toggleSidebars} isSideBarOpen={isSidebarOpen} userData={userData}/>
-      <UserSideBar isOpen={isSidebarOpen} closeSidebar={closeSidebar} userData={userData} setActiveTab={setActiveTab} activeTab={activeTab}/>
+      <UserNavBar toggleSidebar={toggleSidebars} isSideBarOpen={isSidebarOpen} userData={userData} />
+      <UserSideBar isOpen={isSidebarOpen} closeSidebar={closeSidebar} userData={userData} setActiveTab={setActiveTab} activeTab={activeTab} />
       
-      {/* Floating Cart Icon */}
-      <div className="fixed bottom-28 right-5 z-50">
-        <Link to="/user/Cart" className="relative bg-own-2 p-4 rounded-full shadow-2xl hover:scale-110 transition-all duration-300">
+      {/* Floating Cart Icon - disabled when closed */}
+      <Link to="/user/Cart" className={`fixed bottom-28 right-5 z-50 ${!isRestaurantOpen ? 'pointer-events-none opacity-50' : ''}`}>
+        <div className="relative bg-own-2 p-4 rounded-full shadow-2xl hover:scale-110 transition-all duration-300">
           <FontAwesomeIcon icon={faShoppingCart} />
           {getTotalItems() > 0 && (
             <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full font-bold shadow-lg">
               {getTotalItems()}
             </div>
           )}
-        </Link>
-      </div>
+        </div>
+      </Link>
 
       <div className="lg:flex lg:justify-end">
         <div className={`pt-32 px-5 ${isSidebarOpen ? "lg:w-[75%]" : "lg:w-full"} transition-all duration-500`}>
@@ -167,73 +198,47 @@ export default function Menu() {
               <div className="lg:col-span-3">
                 <h3 className="text-own-2 mb-6 uppercase font-bold text-2xl font-display2 tracking-wider">Menu</h3>
                 
-                {/* Loading and Error States */}
-                {loading && (
-                  <div className="text-center py-12">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-own-2 mx-auto"></div>
-                    <p className="mt-4 text-lg text-gray-600">Loading menu...</p>
+                {/* Restaurant closed banner */}
+                {!isRestaurantOpen && (
+                  <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center">
+                    <FontAwesomeIcon icon={faStoreAltSlash} className="text-red-500 text-2xl mr-3" />
+                    <div>
+                      <p className="text-red-700 font-semibold">Restaurant is currently closed</p>
+                      <p className="text-red-600 text-sm">Orders cannot be placed right now. Please check back later.</p>
+                    </div>
                   </div>
                 )}
-                
+
                 {error && (
                   <div className="text-center py-12">
                     <p className="text-xl text-red-600 mb-4">{error}</p>
-                    <button
-                      onClick={() => window.location.reload()}
-                      className="mt-4 bg-own-2 text-white px-6 py-2 rounded-full hover:bg-own-2/90 transition"
-                    >
-                      Retry
-                    </button>
+                    <button onClick={() => window.location.reload()} className="mt-4 bg-own-2 text-white px-6 py-2 rounded-full hover:bg-own-2/90 transition">Retry</button>
                   </div>
                 )}
-                
-                {!loading && !error && (
+
+                {!error && (
                   <>
-                    {/* Search Bar and Category Filter */}
                     <div className="max-w-6xl mx-auto pt-5">
                       <div className="flex flex-row gap-4 justify-center items-center">
-                        {/* Search Input */}
                         <div className="relative w-2/3">
-                          <input
-                            type="text"
-                            placeholder="Search for dishes..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full px-6 py-4 pr-14 rounded-full border border-own-2 focus:ring-own-2 focus:ring-2 text-lg shadow-md placeholder:text-own-2 text-own-2"
-                          />
-                          <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
-                            <FontAwesomeIcon icon={faSearch} className="w-5 h-5 text-own-2" />
-                          </div>
+                          <input type="text" placeholder="Search for dishes..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full px-6 py-4 pr-14 rounded-full border border-own-2 focus:ring-own-2 focus:ring-2 text-lg shadow-md placeholder:text-own-2 text-own-2" />
+                          <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none"><FontAwesomeIcon icon={faSearch} className="w-5 h-5 text-own-2" /></div>
                         </div>
-            
-                        {/* Category Dropdown */}
                         <div className="relative w-1/3">
-                          <select
-                            value={selectedCategory}
-                            onChange={(e) => setSelectedCategory(e.target.value)}
-                            className="w-full px-6 py-4 pr-10 rounded-full border border-own-1 focus:ring-own-1 focus:ring-2 text-lg shadow-md appearance-none bg-own-2 cursor-pointer"
-                          >
-                            {categories.map(category => (
-                              <option key={category} value={category}>
-                                {category}
-                              </option>
-                            ))}
+                          <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="w-full px-6 py-4 pr-10 rounded-full border border-own-1 focus:ring-own-1 focus:ring-2 text-lg shadow-md appearance-none bg-own-2 cursor-pointer">
+                            {categories.map(category => <option key={category} value={category}>{category}</option>)}
                           </select>
-                          <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
-                            <FontAwesomeIcon icon={faFilter} className="w-5 h-5" />
-                          </div>
+                          <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none"><FontAwesomeIcon icon={faFilter} className="w-5 h-5" /></div>
                         </div>
                       </div>
-            
-                      {/* Results Count */}
                       <div className="text-center mt-4 text-gray-600">
                         Showing {filteredItems.length} item{filteredItems.length !== 1 ? 's' : ''}
                         {selectedCategory !== "All" && ` in ${selectedCategory}`}
                         {searchTerm && ` matching "${searchTerm}"`}
+                        {!isRestaurantOpen && " — Orders disabled"}
                       </div>
                     </div>
-            
-                    {/* Menu Items Grid */}
+
                     <div className="max-w-7xl mx-auto pt-4 pb-8">
                       {filteredItems.length > 0 ? (
                         <div className={`grid gap-10 pt-10 ${isSidebarOpen ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-2 landscape:sm:grid-cols-2" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 landscape:sm:grid-cols-2 landscape:lg:grid-cols-3"}`}>
@@ -249,21 +254,14 @@ export default function Menu() {
                               handleInputBlur={handleInputBlur}
                               handleAddToCart={handleAddToCart}
                               renderStars={renderStars}
+                              isRestaurantOpen={isRestaurantOpen}
                             />
                           ))}
                         </div>
                       ) : (
                         <div className="text-center py-12">
                           <p className="text-xl text-black">No dishes found.</p>
-                          <button
-                            onClick={() => {
-                              setSearchTerm("");
-                              setSelectedCategory("All");
-                            }}
-                            className="mt-4 bg-own-2 text-white px-6 py-2 rounded-full hover:bg-own-2/90 transition"
-                          >
-                            Clear Filters
-                          </button>
+                          <button onClick={() => { setSearchTerm(""); setSelectedCategory("All"); }} className="mt-4 bg-own-2 text-white px-6 py-2 rounded-full hover:bg-own-2/90 transition">Clear Filters</button>
                         </div>
                       )}
                     </div>
@@ -288,59 +286,59 @@ function MenuItemCard({
   handleInputChange,
   handleInputBlur,
   handleAddToCart,
-  renderStars
+  renderStars,
+  isRestaurantOpen
 }) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-50px" });
+  const disabled = !item.available || !isRestaurantOpen;
 
   return (
     <motion.div
       ref={ref}
       initial={{ opacity: 0, y: 50, scale: 0.9 }}
       animate={isInView ? { opacity: 1, y: 0, scale: 1 } : {}}
-      transition={{ 
-        duration: 0.6, 
-        ease: "easeOut",
-        delay: 0.1
-      }}
-      className={`bg-white rounded-3xl shadow-lg overflow-hidden transition-transform transform ${item.available ? 'hover:scale-105' : ''}`}
+      transition={{ duration: 0.6, ease: "easeOut", delay: 0.1 }}
+      className={`bg-white rounded-3xl shadow-lg overflow-hidden transition-transform transform ${!disabled ? 'hover:scale-105' : ''}`}
     >
-      {/* Availability Badge */}
       <div className="relative">
         <img 
           src={item.imageUrl} 
           alt={item.name} 
           className={`w-full h-60 object-cover ${!item.available ? 'opacity-60' : ''}`}
-          onError={(e) => {
-            e.target.src = "/fallback-image.jpg";
-          }}
+          onError={(e) => { e.target.src = "/fallback-image.jpg"; }}
         />
         {!item.available && (
           <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1">
-            <FontAwesomeIcon icon={faBan} className="w-3 h-3" />
-            Unavailable
+            <FontAwesomeIcon icon={faBan} className="w-3 h-3" /> Unavailable
+          </div>
+        )}
+        {!isRestaurantOpen && item.available && (
+          <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
+            <span className="text-white text-xl font-bold bg-gray-700 px-4 py-2 rounded-md">Orders Closed</span>
           </div>
         )}
       </div>
-      
-      <div className={`p-6 ${!item.available ? 'bg-gray-100' : ''}`}>
-        <h3 className={`text-xl font-bold mb-2 ${item.available ? 'text-own-2' : 'text-gray-500'}`}>
-          {item.name}
-        </h3>
-        <p className="text-gray-700 mb-2">{item.description || "No description available"}</p>
+      <div className={`p-6 ${disabled ? 'bg-gray-100' : ''}`}>
+        <h3 className={`text-xl font-bold mb-2 ${disabled ? 'text-gray-500' : 'text-own-2'}`}>{item.name}</h3>
+        <p className={`mb-2 ${disabled ? 'text-gray-500' : 'text-gray-700'}`}>{item.description || "No description available"}</p>
         {item.rating && (
           <div className="flex items-center mb-4">
             {renderStars(item.rating)}
-            <span className="ml-2 text-sm text-gray-500">({item.rating})</span>
+            <span className={`ml-2 text-sm ${disabled ? 'text-gray-400' : 'text-gray-500'}`}>({item.rating})</span>
           </div>
         )}
-        
+        <div className="mb-4">
+          <p className={`text-sm font-medium ${!item.available ? 'text-red-600' : isRestaurantOpen ? 'text-green-600' : 'text-orange-600'}`}>
+            {!item.available ? 'Not Available' : isRestaurantOpen ? 'Available' : 'Orders Paused'}
+          </p>
+        </div>
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-3">
             <button 
               onClick={() => decreaseQuantity(item.id)} 
-              disabled={!item.available}
-              className={`${item.available ? 'bg-own-2 hover:bg-own-2/90' : 'bg-gray-400 cursor-not-allowed'} text-white p-2 rounded-full z-30`}
+              disabled={disabled}
+              className={`${disabled ? 'bg-gray-400 cursor-not-allowed' : 'bg-own-2 hover:bg-own-2/90'} text-white p-2 rounded-full z-30`}
             >
               <FontAwesomeIcon icon={faMinus} />
             </button>
@@ -350,33 +348,30 @@ function MenuItemCard({
               value={quantity}
               onChange={(e) => handleInputChange(e, item.id)}
               onBlur={() => handleInputBlur(item.id)}
-              disabled={!item.available}
-              className={`w-16 text-center p-2 border rounded-lg font-bold text-lg ${!item.available ? 'bg-gray-200 cursor-not-allowed text-gray-500' : 'text-black'}`}
+              disabled={disabled}
+              className={`w-16 text-center p-2 border rounded-lg font-bold text-lg ${disabled ? 'bg-gray-200 cursor-not-allowed text-gray-500' : 'text-black'}`}
             />
             <button
               onClick={() => increaseQuantity(item.id)}
-              disabled={!item.available}
-              className={`p-2 rounded-full z-30 text-white ${item.available ? 'bg-own-2 hover:bg-own-2/90' : 'bg-gray-400 cursor-not-allowed'}`}
+              disabled={disabled}
+              className={`p-2 rounded-full z-30 text-white ${disabled ? 'bg-gray-400 cursor-not-allowed' : 'bg-own-2 hover:bg-own-2/90'}`}
             >
               <FontAwesomeIcon icon={faPlus} />
             </button>
           </div>
-          <span className={`text-lg font-semibold ${item.available ? 'text-gray-800' : 'text-gray-500'}`}>
+          <span className={`text-lg font-semibold ${disabled ? 'text-gray-500' : 'text-gray-800'}`}>
             £{(item.price || 0).toFixed(2)}
           </span>
         </div>
-        
         <div className="flex justify-center">
           <button
             onClick={() => handleAddToCart(item)}
-            disabled={!item.available}
+            disabled={disabled}
             className={`w-full py-3 rounded-full font-semibold transition z-30 ${
-              item.available 
-                ? 'bg-own-2 text-white hover:bg-own-2/90' 
-                : 'bg-gray-400 text-gray-700 cursor-not-allowed'
+              disabled ? 'bg-gray-400 text-gray-700 cursor-not-allowed' : 'bg-own-2 text-white hover:bg-own-2/90'
             }`}
           >
-            {item.available ? 'Add to Cart' : 'Currently Unavailable'}
+            {!item.available ? 'Unavailable' : !isRestaurantOpen ? 'Closed' : 'Add to Cart'}
           </button>
         </div>
       </div>

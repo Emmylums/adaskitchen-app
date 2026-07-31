@@ -14,7 +14,8 @@ import {
   faSpinner,
   faUpload,
   faTrash,
-  faTimes
+  faTimes,
+  faStore
 } from '@fortawesome/free-solid-svg-icons';
 import { 
   collection, 
@@ -61,16 +62,8 @@ export default function Settings() {
     chefImageUrl: "",
     chefImageFile: null,
     
-    // Business Hours
-    businessHours: {
-      monday: { open: "09:00", close: "22:00", closed: false },
-      tuesday: { open: "09:00", close: "22:00", closed: false },
-      wednesday: { open: "09:00", close: "22:00", closed: false },
-      thursday: { open: "09:00", close: "22:00", closed: false },
-      friday: { open: "09:00", close: "23:00", closed: false },
-      saturday: { open: "10:00", close: "23:00", closed: false },
-      sunday: { open: "11:00", close: "21:00", closed: false }
-    },
+    // Restaurant Status (Open/Closed)
+    isRestaurantOpen: true,   // default: open
     
     // Payment Settings
     paymentMethods: {
@@ -111,34 +104,26 @@ export default function Settings() {
         console.error("Error fetching chef information:", error);
       }
       
-      // Fetch business hours from 'settings' collection
+      // Fetch restaurant status from 'settings/restaurantStatus'
       try {
-        const hoursRef = doc(db, "settings", "businessHours");
-        const hoursSnapshot = await getDoc(hoursRef);
+        const statusRef = doc(db, "settings", "restaurantStatus");
+        const statusSnapshot = await getDoc(statusRef);
         
-        if (hoursSnapshot.exists()) {
-          const hoursData = hoursSnapshot.data();
-          console.log("Fetched business hours:", hoursData);
-          
-          // Merge with existing hours, ensuring all days exist
-          const mergedHours = { ...settings.businessHours };
-          Object.keys(mergedHours).forEach(day => {
-            if (hoursData[day]) {
-              mergedHours[day] = {
-                ...mergedHours[day],
-                ...hoursData[day]
-              };
-            }
-          });
-          
-          setSettings(prev => ({ 
-            ...prev, 
-            businessHours: mergedHours
+        if (statusSnapshot.exists()) {
+          const statusData = statusSnapshot.data();
+          console.log("Fetched restaurant status:", statusData);
+          setSettings(prev => ({
+            ...prev,
+            isRestaurantOpen: statusData.isOpen !== undefined ? statusData.isOpen : true
           }));
+        } else {
+          // No document yet, default to open
+          console.log("No restaurant status found, defaulting to open");
+          setSettings(prev => ({ ...prev, isRestaurantOpen: true }));
         }
       } catch (error) {
-        console.error("Error fetching business hours:", error);
-      } 
+        console.error("Error fetching restaurant status:", error);
+      }
       
       // Fetch payment settings from 'settings' collection
       try {
@@ -309,8 +294,9 @@ export default function Settings() {
         updatedAt: serverTimestamp()
       };
 
-      const businessHoursData = {
-        ...settings.businessHours,
+      // Restaurant status
+      const restaurantStatusData = {
+        isOpen: settings.isRestaurantOpen,
         updatedAt: serverTimestamp()
       };
 
@@ -320,7 +306,7 @@ export default function Settings() {
       };
 
       console.log("Saving chef data:", chefData);
-      console.log("Saving business hours:", businessHoursData);
+      console.log("Saving restaurant status:", restaurantStatusData);
       console.log("Saving payment data:", paymentData);
 
       // Use batch write for atomic operations
@@ -330,9 +316,9 @@ export default function Settings() {
       const chefRef = doc(db, "settings", "chefInfo");
       batch.set(chefRef, chefData, { merge: true });
 
-      // Save business hours
-      const hoursRef = doc(db, "settings", "businessHours");
-      batch.set(hoursRef, businessHoursData, { merge: true });
+      // Save restaurant status
+      const statusRef = doc(db, "settings", "restaurantStatus");
+      batch.set(statusRef, restaurantStatusData, { merge: true });
 
       // Save payment settings
       const paymentRef = doc(db, "settings", "paymentMethods");
@@ -474,122 +460,42 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* Business Hours Section */}
+      {/* Restaurant Status Section */}
       <div className="bg-white rounded-2xl shadow p-6">
         <h3 className="text-lg font-bold text-own-2 mb-4 flex items-center">
-          <FontAwesomeIcon icon={faClock} className="mr-2" />
-          Business Hours
+          <FontAwesomeIcon icon={faStore} className="mr-2" />
+          Restaurant Status
         </h3>
-        <div className="space-y-3 text-black">
-          {Object.entries(settings.businessHours).map(([day, hours]) => (
-            <div key={day} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50 rounded-lg gap-3 hover:bg-gray-100 transition-colors">
-              <div className="flex items-center space-x-3">
-                <input
-                  type="checkbox"
-                  className="h-5 w-5 text-own-2 rounded focus:ring-own-2 cursor-pointer"
-                  checked={!hours.closed}
-                  onChange={(e) => {
-                    const updatedHours = { ...settings.businessHours };
-                    updatedHours[day].closed = !e.target.checked;
-                    setSettings(prev => ({ ...prev, businessHours: updatedHours }));
-                  }}
-                  disabled={saving}
-                />
-                <span className="capitalize font-medium text-gray-800 min-w-[100px]">
-                  {day.charAt(0).toUpperCase() + day.slice(1)}
-                </span>
-              </div>
-              
-              {!hours.closed ? (
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600 whitespace-nowrap">Open:</span>
-                    <input
-                      type="time"
-                      className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-black focus:ring-2 focus:ring-own-2 focus:border-own-2 w-full sm:w-32 transition-colors"
-                      value={hours.open}
-                      onChange={(e) => {
-                        const updatedHours = { ...settings.businessHours };
-                        updatedHours[day].open = e.target.value;
-                        setSettings(prev => ({ ...prev, businessHours: updatedHours }));
-                      }}
-                      disabled={saving}
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600 whitespace-nowrap">Close:</span>
-                    <input
-                      type="time"
-                      className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-black focus:ring-2 focus:ring-own-2 focus:border-own-2 w-full sm:w-32 transition-colors"
-                      value={hours.close}
-                      onChange={(e) => {
-                        const updatedHours = { ...settings.businessHours };
-                        updatedHours[day].close = e.target.value;
-                        setSettings(prev => ({ ...prev, businessHours: updatedHours }));
-                      }}
-                      disabled={saving}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <span className="text-red-600 font-medium bg-red-50 px-4 py-2 rounded-lg w-full sm:w-auto text-center">
-                  Closed
-                </span>
-              )}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors gap-4">
+          <div>
+            <div className="font-medium text-gray-800">
+              {settings.isRestaurantOpen ? '🟢 Open' : '🔴 Closed'}
             </div>
-          ))}
-        </div>
-        
-        {/* Quick Actions for Business Hours */}
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <h4 className="text-sm font-medium text-gray-700 mb-3">Quick Actions</h4>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => {
-                const updatedHours = { ...settings.businessHours };
-                Object.keys(updatedHours).forEach(day => {
-                  updatedHours[day] = { ...updatedHours[day], closed: false };
-                });
-                setSettings(prev => ({ ...prev, businessHours: updatedHours }));
-              }}
-              disabled={saving}
-              className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors text-sm font-medium disabled:opacity-50"
-            >
-              Open All Days
-            </button>
-            <button
-              onClick={() => {
-                const updatedHours = { ...settings.businessHours };
-                Object.keys(updatedHours).forEach(day => {
-                  updatedHours[day] = { ...updatedHours[day], closed: true };
-                });
-                setSettings(prev => ({ ...prev, businessHours: updatedHours }));
-              }}
-              disabled={saving}
-              className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium disabled:opacity-50"
-            >
-              Close All Days
-            </button>
-            <button
-              onClick={() => {
-                const standardHours = {
-                  monday: { open: "09:00", close: "22:00", closed: false },
-                  tuesday: { open: "09:00", close: "22:00", closed: false },
-                  wednesday: { open: "09:00", close: "22:00", closed: false },
-                  thursday: { open: "09:00", close: "22:00", closed: false },
-                  friday: { open: "09:00", close: "23:00", closed: false },
-                  saturday: { open: "10:00", close: "23:00", closed: false },
-                  sunday: { open: "11:00", close: "21:00", closed: false }
-                };
-                setSettings(prev => ({ ...prev, businessHours: standardHours }));
-              }}
-              disabled={saving}
-              className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium disabled:opacity-50"
-            >
-              Set Standard Hours
-            </button>
+            <div className="text-sm text-gray-500">
+              {settings.isRestaurantOpen 
+                ? 'Customers can place orders.' 
+                : 'Customers cannot place orders.'}
+            </div>
           </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              className="sr-only peer"
+              checked={settings.isRestaurantOpen}
+              onChange={(e) => {
+                setSettings(prev => ({
+                  ...prev,
+                  isRestaurantOpen: e.target.checked
+                }));
+              }}
+              disabled={saving}
+            />
+            <div className="w-14 h-7 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-green-500 transition-colors"></div>
+          </label>
         </div>
+        <p className="text-xs text-gray-400 mt-2">
+          Toggle to open or close the restaurant for orders.
+        </p>
       </div>
     </div>
   );

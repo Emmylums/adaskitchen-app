@@ -4,13 +4,13 @@ import NavBar from "../components/NavBar";
 import MobileNavBar from "../components/MobileNavBar";
 import { motion, useInView } from 'framer-motion';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSearch, faShoppingCart, faPlus, faMinus, faFilter } from "@fortawesome/free-solid-svg-icons";
+import { faSearch, faShoppingCart, faPlus, faMinus, faFilter, faStoreAltSlash } from "@fortawesome/free-solid-svg-icons";
 import AlertBanner from "../components/AlertBanner";
 import { useCart } from "../context/CartContext"; 
 import bg from "../assets/background.jpeg";
 import Footer from "../components/Footer";
 import { db } from "../firebaseConfig";
-import { collection, getDocs, query } from "firebase/firestore";
+import { collection, getDocs, query, doc, getDoc } from "firebase/firestore";
 
 export default function Menu() {
   const [mobileNavBarVisible, setMobileNavBarVisible] = useState(false);
@@ -21,6 +21,8 @@ export default function Menu() {
   const [menuItems, setMenuItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isRestaurantOpen, setIsRestaurantOpen] = useState(true);
+  const [statusLoading, setStatusLoading] = useState(true);
 
   const { addToCart, getTotalItems } = useCart();
 
@@ -29,40 +31,35 @@ export default function Menu() {
     setError(null);
     
     try {
+      // 1. Fetch categories
       let categoryList = ["All"];
       try {
         const categoriesRef = collection(db, "categories");
         const categoriesQuery = query(categoriesRef);
         const categoriesSnapshot = await getDocs(categoriesQuery);
-        
         categoriesSnapshot.forEach((doc) => {
           const data = doc.data();
-          if (data.name) {
-            categoryList.push(data.name);
-          }
+          if (data.name) categoryList.push(data.name);
         });
       } catch (catError) {
         categoryList = ["All", "Main Course", "Appetizers", "Desserts", "Drinks", "Specials"];
       }
-      
       setCategories(categoryList);
-      
+
+      // 2. Fetch menu items
       const items = [];
-      
       try {
         const menusRef = collection(db, "menus");
         const menusQuery = query(menusRef);
         const menusSnapshot = await getDocs(menusQuery);
-        
         if (menusSnapshot.size === 0) {
+          // fallback to "dishes" collection
           try {
             const dishesRef = collection(db, "dishes");
             const dishesQuery = query(dishesRef);
             const dishesSnapshot = await getDocs(dishesQuery);
-            
             dishesSnapshot.forEach((dishDoc) => {
               const dishData = dishDoc.data();
-              
               items.push({
                 id: dishDoc.id,
                 name: dishData.name || dishData.menuItemName || `Dish ${dishDoc.id}`,
@@ -76,12 +73,11 @@ export default function Menu() {
               });
             });
           } catch (dishesError) {
-            // Continue with empty items array
+            // continue
           }
         } else {
           menusSnapshot.forEach((menuDoc) => {
             const menuData = menuDoc.data();
-            
             if (menuData.menuItems && Array.isArray(menuData.menuItems)) {
               menuData.menuItems.forEach((item, index) => {
                 items.push({
@@ -126,12 +122,7 @@ export default function Menu() {
           });
         }
       } catch (menuError) {
-        if (menuError.code === 'permission-denied' || menuError.message.includes('permission')) {
-          setError("Permission denied. Please check Firebase security rules or contact administrator.");
-        } else {
-          setError("Failed to load menu items. Please try again later.");
-        }
-        
+        // fallback sample data
         const sampleItems = [
           {
             id: "1",
@@ -157,10 +148,10 @@ export default function Menu() {
           }
         ];
         setMenuItems(sampleItems);
-        setLoading(false);
-        return;
+        setError("Failed to load menu. Showing sample data.");
+        // still continue to fetch status
       }
-      
+
       if (items.length === 0) {
         const sampleItems = [
           {
@@ -200,18 +191,29 @@ export default function Menu() {
         setMenuItems(sampleItems);
       } else {
         const sortedItems = items.sort((a, b) => {
-          if (a.available === b.available) {
-            return a.originalIndex - b.originalIndex;
-          }
+          if (a.available === b.available) return a.originalIndex - b.originalIndex;
           return a.available ? -1 : 1;
         });
-        
         setMenuItems(sortedItems);
       }
-      
+
+      // 3. Fetch restaurant status
+      try {
+        const statusRef = doc(db, "settings", "restaurantStatus");
+        const statusSnap = await getDoc(statusRef);
+        if (statusSnap.exists()) {
+          setIsRestaurantOpen(statusSnap.data().isOpen !== undefined ? statusSnap.data().isOpen : true);
+        } else {
+          setIsRestaurantOpen(true);
+        }
+      } catch (statusError) {
+        console.error("Error fetching restaurant status:", statusError);
+        setIsRestaurantOpen(true);
+      }
+      setStatusLoading(false);
+
     } catch (err) {
       setError(`Error loading menu: ${err.message}`);
-      
       setCategories(["All", "Main Course", "Appetizers", "Desserts", "Drinks"]);
       setMenuItems([
         {
@@ -237,6 +239,8 @@ export default function Menu() {
           originalIndex: 1
         }
       ]);
+      setIsRestaurantOpen(true);
+      setStatusLoading(false);
     } finally {
       setLoading(false);
     }
@@ -247,7 +251,6 @@ export default function Menu() {
   }, []);
 
   const [quantities, setQuantities] = useState({});
-  
   useEffect(() => {
     if (menuItems.length > 0) {
       const initialQuantities = menuItems.reduce((acc, item) => ({ ...acc, [item.id]: 1 }), {});
@@ -259,16 +262,12 @@ export default function Menu() {
     const matchesSearch = searchTerm.trim() === "" || 
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.description.toLowerCase().includes(searchTerm.toLowerCase());
-    
     const matchesCategory = selectedCategory === "All" || item.category === selectedCategory;
-    
     return matchesSearch && matchesCategory;
   });
 
   const sortedFilteredItems = [...filteredItems].sort((a, b) => {
-    if (a.available === b.available) {
-      return a.originalIndex - b.originalIndex;
-    }
+    if (a.available === b.available) return a.originalIndex - b.originalIndex;
     return a.available ? -1 : 1;
   });
 
@@ -281,17 +280,17 @@ export default function Menu() {
   };
 
   const increaseQuantity = (id, isAvailable) => {
-    if (!isAvailable) return;
+    if (!isAvailable || !isRestaurantOpen) return;
     setQuantities(prev => ({ ...prev, [id]: Math.min(prev[id] + 1, 99) }));
   };
 
   const decreaseQuantity = (id, isAvailable) => {
-    if (!isAvailable) return;
+    if (!isAvailable || !isRestaurantOpen) return;
     setQuantities(prev => ({ ...prev, [id]: Math.max(prev[id] - 1, 1) }));
   };
 
   const handleInputChange = (e, id, isAvailable) => {
-    if (!isAvailable) return;
+    if (!isAvailable || !isRestaurantOpen) return;
     const value = e.target.value;
     if (value === "") {
       setQuantities(prev => ({ ...prev, [id]: "" }));
@@ -304,7 +303,7 @@ export default function Menu() {
   };
 
   const handleInputBlur = (id, isAvailable) => {
-    if (!isAvailable) return;
+    if (!isAvailable || !isRestaurantOpen) return;
     setQuantities(prev => ({
       ...prev,
       [id]: prev[id] === "" || prev[id] < 1 ? 1 : prev[id]
@@ -312,6 +311,10 @@ export default function Menu() {
   };
 
   const handleAddToCart = (item) => {
+    if (!isRestaurantOpen) {
+      showAlert("Restaurant is currently closed. Orders cannot be placed.", "error");
+      return;
+    }
     if (!item.available) {
       showAlert(`${item.name} is currently not available`, "error");
       return;
@@ -335,7 +338,7 @@ export default function Menu() {
     rows.push(sortedFilteredItems.slice(i, i + 3));
   }
 
-  if (loading) {
+  if (loading || statusLoading) {
     return (
       <>
         <NavBar activeLink="Menu" onToggleMobileNavBar={() => setMobileNavBarVisible(!mobileNavBarVisible)} />
@@ -361,16 +364,17 @@ export default function Menu() {
         <NavBar activeLink="Menu" onToggleMobileNavBar={() => setMobileNavBarVisible(!mobileNavBarVisible)} />
         <MobileNavBar isVisible={mobileNavBarVisible} activeLink="Menu" onClose={() => setMobileNavBarVisible(false)} className="md:col-span-1 pt-7" />
 
-        <div className="fixed bottom-28 right-5 z-50">
-          <Link to="/cart" className="relative bg-own-2 p-4 rounded-full shadow-2xl hover:scale-110 transition-all duration-300">
+        {/* Floating cart icon - disabled when closed */}
+        <Link to="/cart" className={`fixed bottom-28 right-5 z-50 ${!isRestaurantOpen ? 'pointer-events-none opacity-50' : ''}`}>
+          <div className="relative bg-own-2 p-4 rounded-full shadow-2xl hover:scale-110 transition-all duration-300">
             <FontAwesomeIcon icon={faShoppingCart} />
             {getTotalItems() > 0 && (
               <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full font-bold shadow-lg">
                 {getTotalItems()}
               </div>
             )}
-          </Link>
-        </div>
+          </div>
+        </Link>
 
         <section style={{ backgroundImage: `url(${bg})` }} className="relative h-[50vh] bg-center bg-cover">
           <div className="absolute inset-0 h-[50vh] opacity-70 bg-black" />
@@ -383,8 +387,21 @@ export default function Menu() {
           </div>
         </section>
 
+        {/* Restaurant closed banner */}
+        {!isRestaurantOpen && (
+          <div className="max-w-6xl mx-auto mt-4 px-4">
+            <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg flex items-center">
+              <FontAwesomeIcon icon={faStoreAltSlash} className="text-red-500 text-2xl mr-3" />
+              <div>
+                <p className="text-red-700 font-semibold">Restaurant is currently closed</p>
+                <p className="text-red-600 text-sm">Orders cannot be placed right now. Please check back later.</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {error && (
-          <div className="max-w-6xl mx-auto mt-8 px-4">
+          <div className="max-w-6xl mx-auto mt-4 px-4">
             <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
               <div className="flex">
                 <div className="flex-shrink-0">
@@ -440,6 +457,7 @@ export default function Menu() {
             {selectedCategory !== "All" && ` in ${selectedCategory}`}
             {searchTerm && ` matching "${searchTerm}"`}
             {availableCount > 0 && unavailableCount > 0 && ` (${availableCount} available, ${unavailableCount} unavailable)`}
+            {!isRestaurantOpen && " — Orders disabled"}
           </div>
         </div>
 
@@ -457,6 +475,7 @@ export default function Menu() {
                   handleInputBlur={handleInputBlur}
                   handleAddToCart={handleAddToCart}
                   renderStars={renderStars}
+                  isRestaurantOpen={isRestaurantOpen}
                 />
               ))}
             </>
@@ -489,7 +508,8 @@ function RowWithAnimation({
   handleInputChange,
   handleInputBlur,
   handleAddToCart,
-  renderStars
+  renderStars,
+  isRestaurantOpen
 }) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
@@ -502,100 +522,110 @@ function RowWithAnimation({
       transition={{ duration: 0.8 }}
       className="grid gap-10 pt-10 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 landscape:grid-cols-2 landscape:lg:grid-cols-3"
     >
-      {row.map((item, itemIndex) => (
-        <motion.div
-          key={item.id}
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={isInView ? { opacity: 1, scale: 1 } : {}}
-          transition={{ delay: itemIndex * 0.2, duration: 0.6, ease: "easeOut" }}
-          className={`bg-white rounded-3xl shadow-lg overflow-hidden transition-transform transform ${
-            item.available ? 'hover:scale-105' : 'opacity-70 cursor-not-allowed'
-          }`}
-        >
-          <div className="relative">
-            <img 
-              src={item.image} 
-              alt={item.name} 
-              className="w-full h-60 object-cover"
-            />
-            {!item.available && (
-              <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-                <span className="text-white text-xl font-bold bg-red-600 px-4 py-2 rounded-md">
-                  Not Available
+      {row.map((item, itemIndex) => {
+        const disabled = !item.available || !isRestaurantOpen;
+        return (
+          <motion.div
+            key={item.id}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={isInView ? { opacity: 1, scale: 1 } : {}}
+            transition={{ delay: itemIndex * 0.2, duration: 0.6, ease: "easeOut" }}
+            className={`bg-white rounded-3xl shadow-lg overflow-hidden transition-transform transform ${
+              disabled ? 'opacity-70 cursor-not-allowed' : 'hover:scale-105'
+            }`}
+          >
+            <div className="relative">
+              <img 
+                src={item.image} 
+                alt={item.name} 
+                className="w-full h-60 object-cover"
+              />
+              {!item.available && (
+                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                  <span className="text-white text-xl font-bold bg-red-600 px-4 py-2 rounded-md">
+                    Not Available
+                  </span>
+                </div>
+              )}
+              {!isRestaurantOpen && item.available && (
+                <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
+                  <span className="text-white text-xl font-bold bg-gray-700 px-4 py-2 rounded-md">
+                    Orders Closed
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="p-6">
+              <h3 className={`text-xl font-bold mb-2 ${disabled ? 'text-gray-500' : 'text-own-2'}`}>
+                {item.name}
+              </h3>
+              <p className={`mb-2 ${disabled ? 'text-gray-500' : 'text-gray-700'}`}>
+                {item.description}
+              </p>
+              <div className="flex items-center mb-2">
+                {renderStars(item.rating)}
+                <span className={`ml-2 text-sm ${disabled ? 'text-gray-400' : 'text-gray-500'}`}>
+                  ({item.rating})
                 </span>
               </div>
-            )}
-          </div>
-          <div className="p-6">
-            <h3 className={`text-xl font-bold mb-2 ${item.available ? 'text-own-2' : 'text-gray-500'}`}>
-              {item.name}
-            </h3>
-            <p className={`mb-2 ${item.available ? 'text-gray-700' : 'text-gray-500'}`}>
-              {item.description}
-            </p>
-            <div className="flex items-center mb-2">
-              {renderStars(item.rating)}
-              <span className={`ml-2 text-sm ${item.available ? 'text-gray-500' : 'text-gray-400'}`}>
-                ({item.rating})
-              </span>
-            </div>
-            <div className="mb-4">
-              <p className={`text-sm font-medium ${item.available ? 'text-green-600' : 'text-red-600'}`}>
-                {item.available ? 'Available' : 'Not Available'}
-              </p>
-            </div>
-            <div className="flex justify-between items-center mb-4">
-              <div className="flex items-center gap-3">
-                <button 
-                  onClick={() => decreaseQuantity(item.id, item.available)}
-                  className={`p-2 rounded-full z-30 ${item.available ? 'bg-own-2 text-white cursor-pointer hover:bg-own-2/90' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
-                  disabled={!item.available}
-                >
-                  <FontAwesomeIcon icon={faMinus} />
-                </button>
-                <input
-                  type="number"
-                  min="1"
-                  max="99"
-                  value={item.available ? (quantities[item.id] || 1) : 0}
-                  onChange={(e) => handleInputChange(e, item.id, item.available)}
-                  onBlur={() => handleInputBlur(item.id, item.available)}
-                  className={`w-16 text-center z-30 p-2 border rounded-lg font-bold text-lg ${
-                    item.available 
-                      ? 'text-black border-gray-300 focus:border-own-2 focus:ring-1 focus:ring-own-2' 
-                      : 'text-gray-400 border-gray-200 bg-gray-100 cursor-not-allowed'
-                  }`}
-                  disabled={!item.available}
-                  readOnly={!item.available}
-                />
+              <div className="mb-4">
+                <p className={`text-sm font-medium ${!item.available ? 'text-red-600' : isRestaurantOpen ? 'text-green-600' : 'text-orange-600'}`}>
+                  {!item.available ? 'Not Available' : isRestaurantOpen ? 'Available' : 'Orders Paused'}
+                </p>
+              </div>
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={() => decreaseQuantity(item.id, item.available)}
+                    className={`p-2 rounded-full z-30 ${disabled ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-own-2 text-white cursor-pointer hover:bg-own-2/90'}`}
+                    disabled={disabled}
+                  >
+                    <FontAwesomeIcon icon={faMinus} />
+                  </button>
+                  <input
+                    type="number"
+                    min="1"
+                    max="99"
+                    value={disabled ? 0 : (quantities[item.id] || 1)}
+                    onChange={(e) => handleInputChange(e, item.id, item.available)}
+                    onBlur={() => handleInputBlur(item.id, item.available)}
+                    className={`w-16 text-center z-30 p-2 border rounded-lg font-bold text-lg ${
+                      disabled 
+                        ? 'text-gray-400 border-gray-200 bg-gray-100 cursor-not-allowed' 
+                        : 'text-black border-gray-300 focus:border-own-2 focus:ring-1 focus:ring-own-2'
+                    }`}
+                    disabled={disabled}
+                    readOnly={disabled}
+                  />
+                  <button
+                    onClick={() => increaseQuantity(item.id, item.available)}
+                    className={`p-2 rounded-full z-30 ${disabled ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-own-2 text-white cursor-pointer hover:bg-own-2/90'}`}
+                    disabled={disabled}
+                  >
+                    <FontAwesomeIcon icon={faPlus} />
+                  </button>
+                </div>
+                <span className={`text-lg font-semibold ${disabled ? 'text-gray-500' : 'text-gray-800'}`}>
+                  £{item.price?.toFixed(2) || "0.00"}
+                </span>
+              </div>
+              <div className="flex justify-center">
                 <button
-                  onClick={() => increaseQuantity(item.id, item.available)}
-                  className={`p-2 rounded-full z-30 ${item.available ? 'bg-own-2 text-white cursor-pointer hover:bg-own-2/90' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
-                  disabled={!item.available}
+                  onClick={() => handleAddToCart(item)}
+                  className={`w-full py-3 rounded-full font-semibold transition z-30 ${
+                    disabled 
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                      : 'bg-own-2 text-white hover:bg-own-2/90 cursor-pointer'
+                  }`}
+                  disabled={disabled}
                 >
-                  <FontAwesomeIcon icon={faPlus} />
+                  {!item.available ? 'Unavailable' : !isRestaurantOpen ? 'Closed' : 'Add to Cart'}
                 </button>
               </div>
-              <span className={`text-lg font-semibold ${item.available ? 'text-gray-800' : 'text-gray-500'}`}>
-                £{item.price?.toFixed(2) || "0.00"}
-              </span>
             </div>
-            <div className="flex justify-center">
-              <button
-                onClick={() => handleAddToCart(item)}
-                className={`w-full py-3 rounded-full font-semibold transition z-30 ${
-                  item.available 
-                    ? 'bg-own-2 text-white hover:bg-own-2/90 cursor-pointer' 
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                }`}
-                disabled={!item.available}
-              >
-                {item.available ? 'Add to Cart' : 'Unavailable'}
-              </button>
-            </div>
-          </div>
-        </motion.div>
-      ))}
+          </motion.div>
+        );
+      })}
     </motion.div>
   );
 }
