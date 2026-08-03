@@ -39,7 +39,7 @@ export default function OurStory() {
                         chefData = {
                             id: chefSnapshot.id,
                             name: data.name || "Ada Johnson",
-                            bio: data.bio || "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist.",
+                            bio: data.bio || "With years of culinary experience, Franklyn brings his grandmother's traditional recipes to life with a modern twist.",
                             image: data.imageUrl || null // This should be the Firebase Storage URL
                         };
                     }
