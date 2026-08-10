@@ -39,7 +39,7 @@ export default function OurStory() {
                         chefData = {
                             id: chefSnapshot.id,
                             name: data.name || "Ada Johnson",
-                            bio: data.bio || "With years of culinary experience, Franklyn brings his grandmother's traditional recipes to life with a modern twist.",
+                            bio: data.bio || "With years of culinary experience, Franklyn brings his mother's traditional recipes to life with a modern twist.",
                             image: data.imageUrl || null // This should be the Firebase Storage URL
                         };
                     }
@@ -110,7 +110,7 @@ export default function OurStory() {
             // Set defaults
             setChef({
                 name: "Ada Johnson",
-                bio: "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist.",
+                bio: "With over 15 years of culinary experience, Ada brings her mother's traditional recipes to life with a modern twist.",
                 image: null
             });
             
@@ -333,7 +333,7 @@ export default function OurStory() {
                                 </div>
                             )}
                             <h3 className="text-2xl font-bold text-own-2 mb-2">{chef?.name || "Ada Johnson"}</h3>
-                            <p className="text-gray-700">{chef?.bio || "With over 15 years of culinary experience, Ada brings her grandmother's traditional recipes to life with a modern twist."}</p>
+                            <p className="text-gray-700">{chef?.bio || "With over 15 years of culinary experience, Ada brings hmother's traditional recipes to life with a modern twist."}</p>
                         </motion.div>
                     </div>
                 </div>
