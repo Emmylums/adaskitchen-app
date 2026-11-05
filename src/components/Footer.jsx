@@ -21,7 +21,7 @@ function Footer(){
                     <section className="z-30">
                         <h2 className="font-semibold pb-2 md:text-center md:text-xl">Contact / Support</h2>
                         <nav className="flex flex-col md:flex-row gap-5 md:text-xl">
-                            <Link to="/Contact Us">Contact Us</Link>
+                            <Link to="/contact-us">Contact Us</Link>
                             <a href="tel:+447466385015">Phone</a>
                             <a>
                                 <button className="hover:cursor-pointer" onClick={() => sendWhatsAppMessage("My name is ...................", "447466385015")}>
