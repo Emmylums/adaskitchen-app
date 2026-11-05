@@ -13,7 +13,6 @@ function Footer(){
                         <h2 className="font-semibold pb-2 md:text-center md:text-xl">Quick Links</h2>
                         <nav className="flex flex-col md:flex-row gap-5 md:text-xl">
                             <Link to="/our-story">About Ada's Kitchen</Link>
-                            <Link to="/contact-us">Contact Us</Link>
                             <Link to="/signup">Sign Up</Link>
                             <Link to="/login">Login</Link>
                         </nav>
