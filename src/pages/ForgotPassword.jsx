@@ -2,356 +2,291 @@ import React, { useState } from "react";
 import NavBar from "../components/NavBar";
 import MobileNavBar from "../components/MobileNavBar";
 import bg from "../assets/bgcont.jpeg";
-import { motion } from 'framer-motion';
+import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import Footer from "../components/Footer";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEnvelope, faExclamationCircle, faCheckCircle, faArrowLeft } from "@fortawesome/free-solid-svg-icons";
+import { faEnvelope, faExclamationCircle, faCheckCircle, faArrowLeft, faKey, faShieldAlt } from "@fortawesome/free-solid-svg-icons";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "../firebaseConfig";
 
 export default function ForgotPassword() {
-    const [mobileNavBarVisible, setMobileNavBarVisible] = useState(false);
-    const [email, setEmail] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
-    const [success, setSuccess] = useState("");
-    const [emailSent, setEmailSent] = useState(false);
+  const [mobileNavBarVisible, setMobileNavBarVisible] = useState(false);
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [emailSent, setEmailSent] = useState(false);
 
-    
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setError("");
-        setSuccess("");
-        setLoading(true);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+    setLoading(true);
 
-        // Validate email
-        if (!email) {
-            setError("Please enter your email address.");
-            setLoading(false);
-            return;
-        }
+    if (!email) {
+      setError("Please enter your email address.");
+      setLoading(false);
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError("Please enter a valid email address.");
+      setLoading(false);
+      return;
+    }
 
-        // Email validation
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            setError("Please enter a valid email address.");
-            setLoading(false);
-            return;
-        }
+    try {
+      await sendPasswordResetEmail(auth, email, {
+        url: `${window.location.origin}/reset-password`,
+        handleCodeInApp: false,
+      });
+      setEmailSent(true);
+      setSuccess(`Password reset link sent to ${email}. Please check your inbox.`);
+    } catch (err) {
+      console.error("Password reset error:", err);
+      switch (err.code) {
+        case "auth/invalid-email":
+          setError("Invalid email address format.");
+          break;
+        case "auth/user-not-found":
+          setEmailSent(true);
+          setSuccess(`If an account exists with ${email}, you will receive a password reset link shortly.`);
+          break;
+        case "auth/too-many-requests":
+          setError("Too many reset attempts. Please try again later.");
+          break;
+        case "auth/network-request-failed":
+          setError("Network error. Please check your internet connection.");
+          break;
+        case "auth/operation-not-allowed":
+          setError("Password reset is not enabled. Please contact support.");
+          break;
+        default:
+          setError(`Failed to send reset email: ${err.message || "Please try again."}`);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        try {
-            // Send password reset email
-            await sendPasswordResetEmail(auth, email, {
-                url: `${window.location.origin}/reset-password`,
-                handleCodeInApp: false // Set to false for password reset
-            });
-            
-            setEmailSent(true);
-            setSuccess(`Password reset link sent to ${email}. Please check your inbox.`);
-            
-        } catch (err) {
-            console.error("Password reset error:", err);
-            console.error("Error details:", err.code, err.message);
-            
-            // Handle specific Firebase errors
-            switch (err.code) {
-                case "auth/invalid-email":
-                    setError("Invalid email address format.");
-                    break;
-                case "auth/user-not-found":
-                    // For security, show generic message
-                    setEmailSent(true);
-                    setSuccess(`If an account exists with ${email}, you will receive a password reset link shortly.`);
-                    break;
-                case "auth/too-many-requests":
-                    setError("Too many reset attempts. Please try again later.");
-                    break;
-                case "auth/network-request-failed":
-                    setError("Network error. Please check your internet connection.");
-                    break;
-                case "auth/operation-not-allowed":
-                    setError("Password reset is not enabled. Please contact support.");
-                    break;
-                default:
-                    setError(`Failed to send reset email: ${err.message || "Please try again."}`);
-            }
-        } finally {
-            setLoading(false);
-        }
-    };
+  const handleResendEmail = () => {
+    setEmailSent(false);
+    setSuccess("");
+    setError("");
+  };
 
-    const handleResendEmail = () => {
-        setEmailSent(false);
-        setSuccess("");
-        setError("");
-    };
+  return (
+    <>
+      <NavBar activeLink="Login" onToggleMobileNavBar={() => setMobileNavBarVisible(!mobileNavBarVisible)} />
+      <MobileNavBar isVisible={mobileNavBarVisible} activeLink="Login" onClose={() => setMobileNavBarVisible(false)} className="md:col-span-1 pt-7" />
 
-    return (
-        <>
-            <NavBar activeLink="Login" onToggleMobileNavBar={() => setMobileNavBarVisible(!mobileNavBarVisible)} />
-            <MobileNavBar isVisible={mobileNavBarVisible} activeLink="Login" onClose={() => setMobileNavBarVisible(false)} className="md:col-span-1 pt-7"/>
-            
-            {/* Hero Section */}
-            <section style={{ backgroundImage: `url(${bg})` }} className="relative h-[40vh] bg-center bg-cover">
-                <div className="absolute inset-0 h-[40vh] opacity-70 bg-black" />
-                <div className="relative flex items-center justify-center h-full">
-                    <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1.0 }}>
-                        <div className="p-10 text-center text-white mt-10">
-                            <h2 className="font-display tracking-widest font-black text-4xl drop-shadow-lg">Reset Password</h2>
-                            <p className="text-lg mt-2">Recover access to your Ada's Kitchen account</p>
-                        </div>
-                    </motion.div>
+      {/* HERO */}
+      <section className="relative h-[50vh] min-h-[240px] overflow-hidden [@media(max-height:500px)]:h-[45vh] [@media(max-height:500px)]:min-h-[190px] [@media(max-height:400px)]:min-h-[170px]">
+        <div style={{ backgroundImage: `url(${bg})` }} className="absolute inset-0 bg-center bg-cover" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/90" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-black/40" />
+
+        <div className="relative flex items-center justify-center h-full px-4 sm:px-6 [@media(max-height:500px)]:px-3">
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1 }}
+            className="text-center text-white max-w-4xl"
+          >
+            <span className="inline-block text-own-2 font-bold tracking-[0.3em] uppercase text-xs md:text-sm mb-4 [@media(max-height:500px)]:mb-1 [@media(max-height:500px)]:text-[10px] [@media(max-height:500px)]:tracking-[0.2em]">
+              Account Recovery
+            </span>
+            <h1 className="font-display font-black text-4xl md:text-6xl leading-tight mb-4 [@media(max-height:500px)]:text-xl [@media(max-height:500px)]:mb-1 [@media(max-height:400px)]:text-lg">
+              Reset Password
+            </h1>
+            <p className="text-lg text-white/80 [@media(max-height:500px)]:text-sm">
+              Recover access to your Ada's Kitchen account
+            </p>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* FORM */}
+      <section className="py-16 px-4 sm:px-6 bg-gray-50 [@media(max-height:600px)]:py-6 [@media(max-height:500px)]:py-4 [@media(max-height:500px)]:px-2">
+        <div className="max-w-md mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="bg-white rounded-3xl shadow-xl overflow-hidden [@media(max-height:500px)]:rounded-2xl"
+          >
+            <div className="h-1.5 bg-gradient-to-r from-own-2 via-[oklch(85%_0.171_83.42)] to-own-2" />
+            <div className="p-8 md:p-10 [@media(max-height:600px)]:p-5 [@media(max-height:500px)]:p-4">
+              <div className="mb-6 [@media(max-height:500px)]:mb-3">
+                <Link to="/login" className="inline-flex items-center text-sm text-own-2 hover:text-amber-600 transition-colors font-medium [@media(max-height:500px)]:text-xs">
+                  <FontAwesomeIcon icon={faArrowLeft} className="mr-2 h-3 w-3" />
+                  Back to Login
+                </Link>
+              </div>
+
+              <h2 className="text-2xl md:text-3xl font-bold text-center text-[oklch(29.23%_0_0)] mb-2 font-display [@media(max-height:500px)]:text-xl [@media(max-height:500px)]:mb-1">
+                Forgot Password
+              </h2>
+              <p className="text-center text-[oklch(40%_0.05_100)] mb-8 text-sm [@media(max-height:500px)]:mb-3 [@media(max-height:500px)]:text-xs">
+                {emailSent ? "Check your email for reset instructions" : "Enter your email and we'll send you a reset link"}
+              </p>
+
+              {error && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl [@media(max-height:500px)]:mb-3 [@media(max-height:500px)]:p-2.5">
+                  <div className="flex items-start">
+                    <FontAwesomeIcon icon={faExclamationCircle} className="h-5 w-5 text-red-400 mr-3 mt-0.5 flex-shrink-0 [@media(max-height:500px)]:h-4 [@media(max-height:500px)]:w-4 [@media(max-height:500px)]:mr-2" />
+                    <p className="text-sm text-red-700 font-medium [@media(max-height:500px)]:text-xs">{error}</p>
+                  </div>
                 </div>
-            </section>
+              )}
 
-            {/* Forgot Password Form Section */}
-            <section className="py-16 bg-gray-50">
-                <div className="max-w-md mx-auto px-4 sm:px-6 lg:px-8">
-                    <motion.div
-                        initial={{ opacity: 0, y: 30 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.6 }}
-                        className="bg-white rounded-2xl shadow-lg p-8"
-                    >
-                        {/* Back to Login */}
-                        <div className="mb-6">
-                            <Link 
-                                to="/login" 
-                                className="inline-flex items-center text-sm text-own-2 hover:text-amber-600 transition-colors font-medium"
-                            >
-                                <FontAwesomeIcon icon={faArrowLeft} className="mr-2 h-3 w-3" />
-                                Back to Login
-                            </Link>
-                        </div>
-
-                        <h2 className="text-3xl font-bold text-center text-own-2 mb-2 font-display2">
-                            Forgot Password
-                        </h2>
-                        
-                        <p className="text-center text-gray-600 mb-8">
-                            {emailSent 
-                                ? "Check your email for reset instructions"
-                                : "Enter your email address and we'll send you a link to reset your password"
-                            }
-                        </p>
-
-                        {/* Error Message */}
-                        {error && (
-                            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl animate-pulse">
-                                <div className="flex items-start">
-                                    <FontAwesomeIcon 
-                                        icon={faExclamationCircle} 
-                                        className="h-5 w-5 text-red-400 mr-3 mt-0.5 flex-shrink-0" 
-                                    />
-                                    <p className="text-sm text-red-700 font-medium">{error}</p>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Success Message */}
-                        {success && (
-                            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl">
-                                <div className="flex items-start">
-                                    <FontAwesomeIcon 
-                                        icon={faCheckCircle} 
-                                        className="h-5 w-5 text-green-400 mr-3 mt-0.5 flex-shrink-0" 
-                                    />
-                                    <div className="flex-1">
-                                        <p className="text-sm text-green-700 font-medium mb-3">{success}</p>
-                                        {emailSent && (
-                                            <div className="space-y-2">
-                                                <div className="flex items-center text-xs text-green-600">
-                                                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                                                    <span>Check your spam/junk folder if you don't see the email</span>
-                                                </div>
-                                                <div className="flex items-center text-xs text-green-600">
-                                                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                                                    <span>The reset link expires in 1 hour</span>
-                                                </div>
-                                                <div className="flex items-center text-xs text-green-600">
-                                                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                                                    <span>You can only request a new link after 1 minute</span>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {!emailSent ? (
-                            <form onSubmit={handleSubmit}>
-                                {/* Email Field */}
-                                <div className="mb-8">
-                                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                                        Email Address
-                                    </label>
-                                    <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <FontAwesomeIcon icon={faEnvelope} className="h-5 w-5 text-gray-400" />
-                                        </div>
-                                        <input
-                                            id="email"
-                                            name="email"
-                                            type="email"
-                                            autoComplete="email"
-                                            required
-                                            value={email}
-                                            onChange={(e) => setEmail(e.target.value)}
-                                            disabled={loading}
-                                            className="block w-full pl-10 pr-3 py-4 border border-gray-300 rounded-xl placeholder-gray-400 focus:ring-2 focus:ring-own-2 focus:border-own-2 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed text-black transition-all duration-200"
-                                            placeholder="Enter your registered email"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Submit Button */}
-                                <button
-                                    type="submit"
-                                    disabled={loading}
-                                    className={`w-full py-4 px-4 border border-transparent rounded-xl shadow-sm text-sm font-bold text-white transition-all duration-300 transform hover:scale-[1.02] ${loading ? 'bg-amber-400 cursor-not-allowed' : 'bg-own-2 hover:bg-amber-600'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-own-2 active:scale-95`}
-                                >
-                                    {loading ? (
-                                        <div className="flex items-center justify-center">
-                                            <svg className="animate-spin h-5 w-5 mr-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                            </svg>
-                                            Sending Reset Link...
-                                        </div>
-                                    ) : (
-                                        "Send Reset Link"
-                                    )}
-                                </button>
-                            </form>
-                        ) : (
-                            <div className="text-center space-y-6">
-                                {/* Success Icon */}
-                                <div className="flex justify-center mb-4">
-                                    <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
-                                        <FontAwesomeIcon 
-                                            icon={faCheckCircle} 
-                                            className="h-10 w-10 text-green-500" 
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Instructions */}
-                                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-left">
-                                    <h4 className="font-medium text-blue-800 mb-2">What to do next:</h4>
-                                    <ol className="list-decimal pl-5 space-y-1 text-sm text-blue-700">
-                                        <li>Open the email from Ada's Kitchen</li>
-                                        <li>Click the "Reset Password" button in the email</li>
-                                        <li>You'll be redirected to create a new password</li>
-                                        <li>Log in with your new password</li>
-                                    </ol>
-                                </div>
-
-                                {/* Action Buttons */}
-                                <div className="space-y-3 pt-4">
-                                    <button
-                                        onClick={handleResendEmail}
-                                        disabled={loading}
-                                        className={`w-full py-3 px-4 border border-own-2 rounded-xl text-sm font-medium transition-all duration-300 transform hover:scale-[1.02] ${loading ? 'bg-gray-100 cursor-not-allowed' : 'bg-white hover:bg-amber-50'} text-own-2 active:scale-95`}
-                                    >
-                                        Resend Email
-                                    </button>
-                                    
-                                    <Link 
-                                        to="/login" 
-                                        className={`block w-full py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-bold text-center transition-all duration-300 transform hover:scale-[1.02] bg-gray-800 hover:bg-gray-900 text-white active:scale-95`}
-                                    >
-                                        Back to Login
-                                    </Link>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Additional Help */}
-                        <div className="mt-8 pt-6 border-t border-gray-200">
-                            <div className="text-center">
-                                <p className="text-sm text-gray-600 mb-2">
-                                    Still having trouble?
-                                </p>
-                                <Link 
-                                    to="/contact" 
-                                    className="text-sm font-medium text-own-2 hover:text-amber-600 transition-colors"
-                                >
-                                    Contact our support team
-                                </Link>
-                            </div>
-                        </div>
-                    </motion.div>
-                </div>
-            </section>
-
-            {/* Security Tips Section */}
-            <section className="py-16 bg-gray-100">
-                <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <h2 className="text-3xl font-bold text-center text-own-2 mb-12 font-display2">
-                        Password Security Tips
-                    </h2>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <motion.div
-                            initial={{ opacity: 0, y: 30 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.6, delay: 0.1 }}
-                            viewport={{ once: true }}
-                            className="bg-white p-6 rounded-xl shadow-sm border border-gray-200"
-                        >
-                            <div className="w-12 h-12 mx-auto mb-4 bg-own-2 bg-opacity-10 rounded-full flex items-center justify-center">
-                                <span className="text-xl">🔒</span>
-                            </div>
-                            <h3 className="text-xl font-semibold mb-3 text-center">Create Strong Passwords</h3>
-                            <ul className="space-y-2 text-gray-600">
-                                <li className="flex items-start">
-                                    <div className="w-1.5 h-1.5 bg-own-2 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-                                    <span>Use at least 12 characters</span>
-                                </li>
-                                <li className="flex items-start">
-                                    <div className="w-1.5 h-1.5 bg-own-2 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-                                    <span>Mix letters, numbers & symbols</span>
-                                </li>
-                                <li className="flex items-start">
-                                    <div className="w-1.5 h-1.5 bg-own-2 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-                                    <span>Avoid common words & phrases</span>
-                                </li>
-                            </ul>
-                        </motion.div>
-
-                        <motion.div
-                            initial={{ opacity: 0, y: 30 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.6, delay: 0.2 }}
-                            viewport={{ once: true }}
-                            className="bg-white p-6 rounded-xl shadow-sm border border-gray-200"
-                        >
-                            <div className="w-12 h-12 mx-auto mb-4 bg-own-2 bg-opacity-10 rounded-full flex items-center justify-center">
-                                <span className="text-xl">🛡️</span>
-                            </div>
-                            <h3 className="text-xl font-semibold mb-3 text-center">Stay Protected</h3>
-                            <ul className="space-y-2 text-gray-600">
-                                <li className="flex items-start">
-                                    <div className="w-1.5 h-1.5 bg-own-2 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-                                    <span>Never share your password</span>
-                                </li>
-                                <li className="flex items-start">
-                                    <div className="w-1.5 h-1.5 bg-own-2 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-                                    <span>Use different passwords for different sites</span>
-                                </li>
-                                <li className="flex items-start">
-                                    <div className="w-1.5 h-1.5 bg-own-2 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-                                    <span>Consider using a password manager</span>
-                                </li>
-                            </ul>
-                        </motion.div>
+              {success && (
+                <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl [@media(max-height:500px)]:mb-3 [@media(max-height:500px)]:p-2.5">
+                  <div className="flex items-start">
+                    <FontAwesomeIcon icon={faCheckCircle} className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0 [@media(max-height:500px)]:h-4 [@media(max-height:500px)]:w-4 [@media(max-height:500px)]:mr-2" />
+                    <div className="flex-1">
+                      <p className="text-sm text-green-700 font-medium mb-2 [@media(max-height:500px)]:text-xs [@media(max-height:500px)]:mb-1">{success}</p>
+                      {emailSent && (
+                        <ul className="text-xs text-green-600 space-y-1 [@media(max-height:500px)]:text-[10px] [@media(max-height:500px)]:space-y-0.5">
+                          <li>• Check your spam/junk folder if you don't see the email</li>
+                          <li>• The reset link expires in 1 hour</li>
+                          <li>• You can only request a new link after 1 minute</li>
+                        </ul>
+                      )}
                     </div>
+                  </div>
                 </div>
-            </section>
+              )}
 
-            <Footer/>
-        </>
-    );
+              {!emailSent ? (
+                <form onSubmit={handleSubmit} className="space-y-5 [@media(max-height:500px)]:space-y-3">
+                  <div>
+                    <label htmlFor="email" className="block text-sm font-semibold text-[oklch(29.23%_0_0)] mb-2 uppercase tracking-wider [@media(max-height:500px)]:mb-1 [@media(max-height:500px)]:text-xs">
+                      Email Address
+                    </label>
+                    <div className="relative">
+                      <FontAwesomeIcon icon={faEnvelope} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
+                      <input
+                        id="email"
+                        name="email"
+                        type="email"
+                        autoComplete="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        disabled={loading}
+                        className="w-full pl-12 pr-4 py-4 rounded-2xl border-2 border-gray-200 focus:outline-none focus:border-own-2 transition-colors text-[oklch(29.23%_0_0)] disabled:bg-gray-100 [@media(max-height:600px)]:py-3 [@media(max-height:500px)]:py-2.5 [@media(max-height:500px)]:rounded-xl [@media(max-height:500px)]:text-sm"
+                        placeholder="Enter your registered email"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full inline-flex items-center justify-center gap-3 bg-own-2 hover:bg-[oklch(85%_0.171_83.42)] text-[oklch(29.23%_0_0)] font-semibold py-4 rounded-full tracking-wide transition-all duration-300 shadow-md disabled:opacity-50 [@media(max-height:600px)]:py-3 [@media(max-height:500px)]:py-2.5 [@media(max-height:500px)]:text-sm"
+                  >
+                    {loading ? (
+                      <>
+                        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Sending Reset Link...
+                      </>
+                    ) : (
+                      "Send Reset Link"
+                    )}
+                  </button>
+                </form>
+              ) : (
+                <div className="space-y-4 [@media(max-height:500px)]:space-y-2">
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 [@media(max-height:500px)]:p-3">
+                    <h4 className="font-medium text-blue-800 mb-2 [@media(max-height:500px)]:text-sm [@media(max-height:500px)]:mb-1">What to do next:</h4>
+                    <ol className="list-decimal pl-5 space-y-1 text-sm text-blue-700 [@media(max-height:500px)]:text-xs [@media(max-height:500px)]:space-y-0.5">
+                      <li>Open the email from Ada's Kitchen</li>
+                      <li>Click the "Reset Password" button in the email</li>
+                      <li>You'll be redirected to create a new password</li>
+                      <li>Log in with your new password</li>
+                    </ol>
+                  </div>
+
+                  <button
+                    onClick={handleResendEmail}
+                    disabled={loading}
+                    className="w-full py-3 px-4 border-2 border-own-2 rounded-full text-sm font-semibold text-own-2 hover:bg-amber-50 transition-colors disabled:opacity-50 [@media(max-height:500px)]:py-2 [@media(max-height:500px)]:text-xs"
+                  >
+                    Resend Email
+                  </button>
+                  <Link
+                    to="/login"
+                    className="block w-full py-3 px-4 bg-[oklch(29.23%_0_0)] hover:bg-own-2 hover:text-[oklch(29.23%_0_0)] text-white font-semibold rounded-full text-center transition-colors [@media(max-height:500px)]:py-2 [@media(max-height:500px)]:text-xs"
+                  >
+                    Back to Login
+                  </Link>
+                </div>
+              )}
+
+              <div className="mt-8 pt-6 border-t border-gray-200 text-center [@media(max-height:500px)]:mt-4 [@media(max-height:500px)]:pt-3">
+                <p className="text-sm text-[oklch(40%_0.05_100)] mb-2 [@media(max-height:500px)]:text-xs [@media(max-height:500px)]:mb-1">Still having trouble?</p>
+                <Link to="/contact" className="text-sm font-medium text-own-2 hover:text-amber-600 transition-colors [@media(max-height:500px)]:text-xs">
+                  Contact our support team
+                </Link>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* TIPS SECTION */}
+      <section className="py-20 px-4 sm:px-6 bg-own-1 [@media(max-height:600px)]:py-8 [@media(max-height:500px)]:py-6 [@media(max-height:500px)]:px-3">
+        <div className="max-w-4xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-12 [@media(max-height:600px)]:mb-6 [@media(max-height:500px)]:mb-3"
+          >
+            <span className="inline-block text-own-2 font-bold tracking-[0.3em] uppercase text-xs md:text-sm mb-4 [@media(max-height:500px)]:mb-1 [@media(max-height:500px)]:text-[10px]">
+              Stay Protected
+            </span>
+            <h2 className="text-3xl md:text-4xl font-bold text-white font-display [@media(max-height:500px)]:text-xl">
+              Password Security Tips
+            </h2>
+          </motion.div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 [@media(max-height:500px)]:gap-3">
+            {[
+              { icon: faKey, title: "Create Strong Passwords", points: ["Use at least 12 characters", "Mix letters, numbers & symbols", "Avoid common words & phrases"] },
+              { icon: faShieldAlt, title: "Stay Protected", points: ["Never share your password", "Use different passwords for different sites", "Consider using a password manager"] },
+            ].map((card, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.1 }}
+                viewport={{ once: true }}
+                className="bg-white/5 backdrop-blur-sm border border-white/10 p-8 rounded-3xl hover:bg-white/10 hover:border-own-2/50 transition-all duration-300 [@media(max-height:500px)]:p-4 [@media(max-height:500px)]:rounded-2xl"
+              >
+                <div className="w-14 h-14 rounded-2xl bg-own-2 flex items-center justify-center mb-6 [@media(max-height:500px)]:w-10 [@media(max-height:500px)]:h-10 [@media(max-height:500px)]:mb-2 [@media(max-height:500px)]:rounded-xl">
+                  <FontAwesomeIcon icon={card.icon} className="text-[oklch(29.23%_0_0)] text-xl [@media(max-height:500px)]:text-sm" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-4 [@media(max-height:500px)]:text-base [@media(max-height:500px)]:mb-1">{card.title}</h3>
+                <ul className="space-y-2 [@media(max-height:500px)]:space-y-1">
+                  {card.points.map((p, j) => (
+                    <li key={j} className="flex items-start gap-3 text-white/70 text-sm [@media(max-height:500px)]:gap-2 [@media(max-height:500px)]:text-xs">
+                      <div className="w-1.5 h-1.5 bg-own-2 rounded-full mt-2 flex-shrink-0 [@media(max-height:500px)]:mt-1.5" />
+                      <span>{p}</span>
+                    </li>
+                  ))}
+                </ul>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+      <Footer />
+    </>
+  );
 }

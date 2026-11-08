@@ -64,7 +64,7 @@ function App() {
         <Route exact path="/" element={<Home/>}/>
         <Route exact path="/our-story" element={<OurStory/>}/>
         <Route exact path="/menu" element={<Menu/>}/>
-        {/* <Route exact path="/catering" element={<Catering/>}/> */}
+        <Route exact path="/catering" element={<Catering/>}/>
         {/* <Route exact path="/gallery" element={<Gallery/>}/> */}
         <Route exact path="/terms-and-conditions" element={<TermsAndConditions/>}/>
         <Route exact path="/privacy-policy" element={<PrivacyPolicy/>}/>
