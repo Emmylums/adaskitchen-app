@@ -17,7 +17,8 @@ import {
   faSpinner,
   faFire,
   faLeaf,
-  faClock
+  faClock,
+  faGift
 } from '@fortawesome/free-solid-svg-icons';
 import { 
   collection, 
@@ -397,7 +398,9 @@ export default function MenuManagement() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-                    {filteredMenuItems.map(item => (
+                    {filteredMenuItems.map(item => {
+                      const isComplimentary = Number(item.price) === 0;
+                      return (
                       <div key={item.id} className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300">
                         {/* Image Section */}
                         <div className="h-48 relative overflow-hidden bg-gradient-to-br from-own-2/20 to-amber-400/20">
@@ -440,6 +443,14 @@ export default function MenuManagement() {
                               </span>
                             )}
                           </div>
+
+                          {/* Complimentary Badge — shown whenever price is 0 */}
+                          {isComplimentary && (
+                            <div className="absolute bottom-3 left-3 bg-own-2 text-white px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1.5 shadow-lg ring-2 ring-white/70 z-10">
+                              <FontAwesomeIcon icon={faGift} className="text-xs" />
+                              Complimentary
+                            </div>
+                          )}
                           
                           {/* Availability Badge */}
                           <div className="absolute bottom-3 right-3">
@@ -517,7 +528,8 @@ export default function MenuManagement() {
                           </div>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </>
@@ -639,6 +651,9 @@ export default function MenuManagement() {
                         onChange={(e) => setMenuForm({...menuForm, price: e.target.value})}
                         placeholder="50"
                       />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Set to 0 to mark as Complimentary
+                      </p>
                     </div>
                   </div>
 

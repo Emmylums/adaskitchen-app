@@ -13,6 +13,7 @@ import {
   faStoreAltSlash,
   faStar,
   faExclamationTriangle,
+  faGift,
 } from "@fortawesome/free-solid-svg-icons";
 import AlertBanner from "../components/AlertBanner";
 import { useCart } from "../context/CartContext";
@@ -419,6 +420,7 @@ export default function Menu() {
             <div className="grid gap-8 pt-8 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 [@media(max-height:600px)]:gap-4 [@media(max-height:600px)]:pt-4 [@media(max-height:500px)]:gap-3 [@media(max-height:500px)]:pt-3">
               {sortedFilteredItems.map((item, itemIndex) => {
                 const disabled = !item.available || !isRestaurantOpen;
+                const isComplimentary = Number(item.price) === 0;
                 return (
                   <motion.div
                     key={item.id}
@@ -457,6 +459,19 @@ export default function Menu() {
                           </span>
                         </div>
                       )}
+
+                      {/* Complimentary floating badge — shows whenever price is 0 */}
+                      {isComplimentary && (
+                        <motion.div
+                          animate={{ y: [0, -4, 0] }}
+                          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                          className="absolute top-3 left-3 z-10 bg-own-2 text-[oklch(29.23%_0_0)] px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-xl font-bold text-xs uppercase tracking-wider ring-2 ring-white/60 pointer-events-none [@media(max-height:500px)]:top-2 [@media(max-height:500px)]:left-2 [@media(max-height:500px)]:px-2 [@media(max-height:500px)]:py-1 [@media(max-height:500px)]:text-[9px] [@media(max-height:500px)]:gap-1"
+                        >
+                          <FontAwesomeIcon icon={faGift} className="text-[10px] [@media(max-height:500px)]:text-[8px]" />
+                          Complimentary
+                        </motion.div>
+                      )}
+
                       {/* Rating badge */}
                       <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm px-3 py-1 rounded-full flex items-center gap-1 shadow-md [@media(max-height:500px)]:top-2 [@media(max-height:500px)]:right-2">
                         <FontAwesomeIcon icon={faStar} className="text-own-2 text-xs" />

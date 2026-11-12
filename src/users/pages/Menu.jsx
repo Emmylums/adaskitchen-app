@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion, useInView } from 'framer-motion';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSearch, faShoppingCart, faPlus, faMinus, faFilter, faBan, faStoreAltSlash } from "@fortawesome/free-solid-svg-icons";
+import { faSearch, faShoppingCart, faPlus, faMinus, faFilter, faBan, faStoreAltSlash, faGift } from "@fortawesome/free-solid-svg-icons";
 import AlertBanner from "../../components/AlertBanner";
 import { useCart } from "../../context/CartContext";
 import UserNavBar from "../components/UserNavbar";
@@ -292,6 +292,7 @@ function MenuItemCard({
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-50px" });
   const disabled = !item.available || !isRestaurantOpen;
+  const isComplimentary = Number(item.price) === 0;
 
   return (
     <motion.div
@@ -317,6 +318,18 @@ function MenuItemCard({
           <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
             <span className="text-white text-xl font-bold bg-gray-700 px-4 py-2 rounded-md">Orders Closed</span>
           </div>
+        )}
+
+        {/* Complimentary floating badge — shows whenever price is 0 */}
+        {isComplimentary && (
+          <motion.div
+            animate={{ y: [0, -4, 0] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute top-4 left-4 z-10 bg-own-2 text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-xl font-bold text-xs uppercase tracking-wider ring-2 ring-white/60 pointer-events-none"
+          >
+            <FontAwesomeIcon icon={faGift} className="text-[10px]" />
+            Complimentary
+          </motion.div>
         )}
       </div>
       <div className={`p-6 ${disabled ? 'bg-gray-100' : ''}`}>
