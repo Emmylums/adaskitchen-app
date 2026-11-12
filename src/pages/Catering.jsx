@@ -4,7 +4,6 @@ import MobileNavBar from "../components/MobileNavBar";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
 import bg from "../assets/bgcont.jpeg";
-import cateringVideo from "../assets/chicken_vid.mp4";
 import Footer from "../components/Footer";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -216,17 +215,10 @@ export default function Catering() {
             {/* ============================================================ */}
             {/*  HERO — full-screen video, cinematic overlays                */}
             {/* ============================================================ */}
-            <section className="relative h-screen min-h-[420px] overflow-hidden [@media(max-height:500px)]:min-h-[340px] [@media(max-height:400px)]:min-h-[300px]">
-                <video
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    poster={bg}
-                    className="absolute inset-0 w-full h-full object-cover"
-                >
-                    <source src={cateringVideo} type="video/mp4" />
-                </video>
+            <section
+                style={{ backgroundImage: `url(${bg})` }}
+                className="relative h-screen min-h-[420px] bg-center bg-cover overflow-hidden [@media(max-height:500px)]:min-h-[340px]"
+            >
 
                 <div className="absolute inset-0 bg-gradient-to-b from-black/75 via-black/55 to-black/90" />
                 <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-black/40" />

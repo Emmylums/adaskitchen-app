@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import NavBar from "../components/NavBar";
 import MobileNavBar from "../components/MobileNavBar";
 import bg from "../assets/bg.jpeg";
-import cateringVideo from "../assets/chicken_vid.mp4";
 import jollof from "../assets/food2.jpeg";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -702,7 +701,7 @@ export default function Home() {
           {/* CATERING SERVICES — FULL-BLEED VIDEO                        */}
           {/* ============================================================ */}
           <section className="relative py-24 px-4 sm:px-6 overflow-hidden [@media(max-height:600px)]:py-12 [@media(max-height:500px)]:py-8">
-            <video
+            {/* <video
               autoPlay
               loop
               muted
@@ -711,7 +710,7 @@ export default function Home() {
             >
               <source src={cateringVideo} type="video/mp4" />
               Your browser does not support the video tag.
-            </video>
+            </video> */}
 
             <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/65 to-black/40" />
             <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/50" />

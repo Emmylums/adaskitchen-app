@@ -408,7 +408,7 @@ export default function OurStory() {
               <img
                 src={cooking}
                 alt="Chef cooking"
-                className="w-full h-[300px] md:h-[550px] object-cover [@media(max-height:500px)]:h-[220px]"
+                className="w-full h-[300px] md:h-[550px] object-cover object-top [@media(max-height:500px)]:h-[220px]"
               />
             </div>
 
